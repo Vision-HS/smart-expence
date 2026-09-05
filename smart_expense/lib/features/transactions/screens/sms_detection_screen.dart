@@ -1,0 +1,914 @@
+import 'package:flutter/material.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/bottom_navigation.dart';
+
+class _PendingSmsTransaction {
+  final String id;
+  String merchant;
+  double amount;
+  String paymentMode;
+  String timeString;
+  String timeAgo;
+  String suggestedCategory;
+  IconData categoryIcon;
+  String bankSource;
+  IconData bankIcon;
+  IconData merchantIcon;
+  Color merchantIconBg;
+  Color merchantIconColor;
+  bool isSecondCard; // For button pairing (Edit vs Ignore)
+
+  _PendingSmsTransaction({
+    required this.id,
+    required this.merchant,
+    required this.amount,
+    required this.paymentMode,
+    required this.timeString,
+    required this.timeAgo,
+    required this.suggestedCategory,
+    required this.categoryIcon,
+    required this.bankSource,
+    required this.bankIcon,
+    required this.merchantIcon,
+    required this.merchantIconBg,
+    required this.merchantIconColor,
+    this.isSecondCard = false,
+  });
+}
+
+class SmsDetectionScreen extends StatefulWidget {
+  const SmsDetectionScreen({super.key});
+
+  @override
+  State<SmsDetectionScreen> createState() => _SmsDetectionScreenState();
+}
+
+class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
+  final List<_PendingSmsTransaction> _pendingTransactions = [
+    _PendingSmsTransaction(
+      id: 'sms_1',
+      merchant: 'Rahul',
+      amount: 500.0,
+      paymentMode: 'UPI',
+      timeString: '03 Sep, 09:15 AM',
+      timeAgo: 'Just now',
+      suggestedCategory: 'Food',
+      categoryIcon: Icons.restaurant_rounded,
+      bankSource: 'Detected from HDFC Bank SMS',
+      bankIcon: Icons.account_balance_outlined,
+      merchantIcon: Icons.person_outline_rounded,
+      merchantIconBg: const Color(0xFFEAEDFF),
+      merchantIconColor: const Color(0xFF4648D4),
+      isSecondCard: false,
+    ),
+    _PendingSmsTransaction(
+      id: 'sms_2',
+      merchant: 'Amazon',
+      amount: 1299.0,
+      paymentMode: 'Card',
+      timeString: 'Today, 10:42 AM',
+      timeAgo: '12m ago',
+      suggestedCategory: 'Shopping',
+      categoryIcon: Icons.shopping_bag_outlined,
+      bankSource: 'Detected from ICICI Bank SMS',
+      bankIcon: Icons.credit_card_outlined,
+      merchantIcon: Icons.shopping_bag_outlined,
+      merchantIconBg: const Color(0xFF6CF8BB),
+      merchantIconColor: const Color(0xFF006C49),
+      isSecondCard: true,
+    ),
+  ];
+
+  final List<Map<String, dynamic>> _confirmedList = [];
+
+  void _confirmTransaction(_PendingSmsTransaction tx) {
+    setState(() {
+      _confirmedList.add({
+        'merchant': tx.merchant,
+        'amount': tx.amount,
+        'category': tx.suggestedCategory,
+        'payment': tx.paymentMode,
+      });
+      _pendingTransactions.removeWhere((item) => item.id == tx.id);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✓ \u20B9${tx.amount.toInt()} to ${tx.merchant} confirmed!'),
+        backgroundColor: const Color(0xFF006C49),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  void _ignoreTransaction(_PendingSmsTransaction tx) {
+    setState(() {
+      _pendingTransactions.removeWhere((item) => item.id == tx.id);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Transaction from ${tx.merchant} ignored.'),
+        backgroundColor: const Color(0xFF464554),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  void _showCategoryPicker(_PendingSmsTransaction tx) {
+    final categories = [
+      {'name': 'Food', 'icon': Icons.restaurant_rounded},
+      {'name': 'Shopping', 'icon': Icons.shopping_bag_outlined},
+      {'name': 'Travel', 'icon': Icons.directions_car_outlined},
+      {'name': 'Entertainment', 'icon': Icons.movie_outlined},
+      {'name': 'Bills', 'icon': Icons.receipt_long_outlined},
+      {'name': 'Health', 'icon': Icons.medical_services_outlined},
+      {'name': 'General', 'icon': Icons.category_outlined},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.7,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Change Category',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...categories.map((c) {
+                final isSel = c['name'] == tx.suggestedCategory;
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  tileColor: isSel ? const Color(0xFFEAEDFF) : null,
+                  leading: Icon(
+                    c['icon'] as IconData,
+                    color: isSel ? AppTheme.primary : AppTheme.textSecondary,
+                  ),
+                  title: Text(
+                    c['name'] as String,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 15,
+                      fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                      color: isSel ? AppTheme.primary : AppTheme.textPrimary,
+                    ),
+                  ),
+                  trailing: isSel
+                      ? const Icon(Icons.check_rounded, color: AppTheme.primary)
+                      : null,
+                  onTap: () {
+                    setState(() {
+                      tx.suggestedCategory = c['name'] as String;
+                      tx.categoryIcon = c['icon'] as IconData;
+                    });
+                    Navigator.pop(ctx);
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  },
+);
+  }
+
+  void _showEditSheet(_PendingSmsTransaction tx) {
+    final merchantCtrl = TextEditingController(text: tx.merchant);
+    final amountCtrl = TextEditingController(text: tx.amount.toInt().toString());
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Edit Transaction Details',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: merchantCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Merchant / Payee',
+                  labelStyle: const TextStyle(color: Color(0xFF464554)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.storefront_outlined),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: amountCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Amount (\u20B9)',
+                  labelStyle: const TextStyle(color: Color(0xFF464554)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.currency_rupee_rounded),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel', style: TextStyle(color: Color(0xFF464554))),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4648D4),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          tx.merchant = merchantCtrl.text.trim();
+                          final parsedAmt = double.tryParse(amountCtrl.text.trim());
+                          if (parsedAmt != null) {
+                            tx.amount = parsedAmt;
+                          }
+                        });
+                        Navigator.pop(ctx);
+                        _confirmTransaction(tx);
+                      },
+                      child: const Text('Save & Confirm', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.surface,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 12),
+              _buildTopBar(context),
+              const SizedBox(height: 16),
+              _buildSubheader(context),
+              const SizedBox(height: 16),
+              _buildAiSmartCaptureBanner(),
+              const SizedBox(height: 16),
+              if (_pendingTransactions.isEmpty)
+                _buildAllCaughtUpState()
+              else
+                ..._pendingTransactions.map((tx) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: _buildTransactionCard(tx),
+                    )),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: BottomNavigation(
+        currentIndex: 1, // Expenses tab selected
+        onTap: (index) {
+          Navigator.pop(context, _confirmedList.isNotEmpty ? _confirmedList : null);
+        },
+      ),
+    );
+  }
+
+  // 1. Top Bar: "Expenses" + Notification bell + User avatar
+  Widget _buildTopBar(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'Expenses',
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textPrimary,
+            letterSpacing: -0.5,
+          ),
+        ),
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(
+                Icons.notifications_none_rounded,
+                color: AppTheme.textPrimary,
+                size: 24,
+              ),
+              onPressed: () {},
+            ),
+            const SizedBox(width: 4),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: AppTheme.primary,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.person,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // 2. Subheader: Back arrow + "New Transactions" / "Smart SMS Sync" + Pending pill
+  Widget _buildSubheader(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Row(
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () {
+                Navigator.pop(context, _confirmedList.isNotEmpty ? _confirmedList : null);
+              },
+              child: const Padding(
+                padding: EdgeInsets.all(4.0),
+                child: Icon(
+                  Icons.arrow_back,
+                  color: AppTheme.textPrimary,
+                  size: 24,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'New Transactions',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Smart SMS Sync',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF767586),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        // Pending Count Pill
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFDAD6),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFB61722),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '${_pendingTransactions.length} Pending',
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFB61722),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 3. AI Smart Capture Banner
+  Widget _buildAiSmartCaptureBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F3FF),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE2E7FF),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              color: Color(0xFF4648D4),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AI Smart Capture',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Automatically detected from bank & UPI SMS. Review and confirm to instantly update your ledger.',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12.5,
+                    height: 1.38,
+                    color: Color(0xFF464554),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 4. Pending Transaction Card with Red Accent Stripe
+  Widget _buildTransactionCard(_PendingSmsTransaction tx) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Stack(
+          children: [
+            // Solid Red Left Edge Stripe (4px)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 4,
+              child: Container(
+                color: const Color(0xFFDA3437),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Row 1: "New transaction detected" (red) + Timestamp
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: const [
+                          Icon(
+                            Icons.sms_outlined,
+                            size: 16,
+                            color: Color(0xFFDA3437),
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'New transaction detected',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFDA3437),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        tx.timeAgo,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF767586),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Row 2: Merchant Avatar + Name & Time + Amount & DEBIT
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: tx.merchantIconBg,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              tx.merchantIcon,
+                              color: tx.merchantIconColor,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                tx.merchant,
+                                style: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '${tx.paymentMode} \u2022 ${tx.timeString}',
+                                style: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF767586),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '-\u20B9${tx.amount >= 1000 ? _formatNumber(tx.amount) : tx.amount.toInt()}',
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFB61722),
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'DEBIT',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF767586),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Row 3: Suggested Category Pill
+                  GestureDetector(
+                    onTap: () => _showCategoryPicker(tx),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAEDFF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            tx.categoryIcon,
+                            size: 14,
+                            color: const Color(0xFF4648D4),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Suggested: ${tx.suggestedCategory}',
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF4648D4),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 16,
+                            color: Color(0xFF4648D4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Row 4: Bank SMS Detection Source
+                  Row(
+                    children: [
+                      Icon(
+                        tx.bankIcon,
+                        size: 14,
+                        color: const Color(0xFF767586),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        tx.bankSource,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF767586),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Row 5: Action Buttons (Confirm + Edit or Confirm + Ignore)
+                  Row(
+                    children: [
+                      // Confirm Button (Blue)
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _confirmTransaction(tx),
+                          child: Container(
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4648D4),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.check_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Confirm',
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Secondary Button: Edit (for Card 1) or Ignore (for Card 2)
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            if (!tx.isSecondCard) {
+                              _showEditSheet(tx);
+                            } else {
+                              _ignoreTransaction(tx);
+                            }
+                          },
+                          child: Container(
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: !tx.isSecondCard ? const Color(0xFFEAEDFF) : const Color(0xFFF2F3FF),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  !tx.isSecondCard ? Icons.edit_outlined : Icons.close_rounded,
+                                  color: !tx.isSecondCard ? const Color(0xFF131B2E) : const Color(0xFF464554),
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  !tx.isSecondCard ? 'Edit' : 'Ignore',
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: !tx.isSecondCard ? const Color(0xFF131B2E) : const Color(0xFF464554),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 5. Empty State when all pending transactions are confirmed or dismissed
+  Widget _buildAllCaughtUpState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: const BoxDecoration(
+              color: Color(0xFFEAEDFF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.done_all_rounded,
+              color: Color(0xFF4648D4),
+              size: 32,
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'All caught up!',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'No pending SMS transactions. We will notify you when new bank alerts arrive.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13.5,
+              height: 1.4,
+              color: Color(0xFF767586),
+            ),
+          ),
+          const SizedBox(height: 24),
+          GestureDetector(
+            onTap: () {
+              Navigator.pop(context, _confirmedList.isNotEmpty ? _confirmedList : null);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4648D4),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Back to Expenses',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatNumber(double num) {
+    // 1299 -> "1,299"
+    final intVal = num.toInt();
+    final str = intVal.toString();
+    if (str.length <= 3) return str;
+    final lastThree = str.substring(str.length - 3);
+    final rest = str.substring(0, str.length - 3);
+    return '$rest,$lastThree';
+  }
+}
