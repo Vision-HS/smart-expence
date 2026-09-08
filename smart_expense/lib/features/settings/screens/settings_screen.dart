@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../categories/screens/categories_screen.dart';
 import 'automatic_detection_screen.dart';
+import 'profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback? onBack;
@@ -204,7 +205,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             iconBg: const Color(0xFFEEF2FF),
             title: 'Profile',
             subtitle: 'Hiren \u2022 hs@email.com',
-            onTap: () => _showToast('Profile: Hiren (hs@email.com)'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            },
           ),
           const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
           _buildSettingsRow(

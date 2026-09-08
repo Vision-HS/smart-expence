@@ -2,11 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:smart_expense/main.dart';
 
 void main() {
-  testWidgets('App starts without crashing', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('App starts with LoginScreen and displays key elements', (WidgetTester tester) async {
     await tester.pumpWidget(const SmartExpenseApp());
 
-    // Verify that the app starts (we have a Home tab in the bottom nav).
-    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Smart Expense'), findsWidgets);
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Unlock Smart Expense'), findsOneWidget);
+    expect(find.text('Phone & OTP'), findsOneWidget);
+    expect(find.text('Use Fingerprint / Face Unlock'), findsOneWidget);
   });
 }

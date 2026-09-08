@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
-import 'features/home/screens/main_wrapper_screen.dart';
+import 'features/auth/screens/login_screen.dart';
 
 void main() {
   runApp(const SmartExpenseApp());
@@ -14,7 +14,7 @@ class SmartExpenseApp extends StatelessWidget {
     return MaterialApp(
       title: 'Smart Expense',
       theme: AppTheme.lightTheme,
-      home: const MainWrapperScreen(),
+      home: const LoginScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
