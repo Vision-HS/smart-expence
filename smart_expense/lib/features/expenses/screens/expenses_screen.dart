@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../models/transaction_model.dart';
+import '../repositories/transaction_repository.dart';
 import 'add_expense_screen.dart';
 import '../../transactions/screens/sms_detection_screen.dart';
 import '../../transactions/screens/transaction_details_screen.dart';
@@ -11,128 +13,45 @@ class ExpensesScreen extends StatefulWidget {
   State<ExpensesScreen> createState() => _ExpensesScreenState();
 }
 
-class _ExpenseItemModel {
-  final String dateGroup;
-  final String title;
-  final String subtitle;
-  final double amount;
-  final String account;
-  final IconData icon;
-  final Color iconBgColor;
-  final Color iconColor;
-  final String? badgeText;
-  final Color? badgeBgColor;
-  final Color? badgeTextColor;
-  final bool isIncome;
-  final String paymentType;
-  final String monthYear; // e.g. "October 2024", "September 2024"
-
-  _ExpenseItemModel({
-    required this.dateGroup,
-    required this.title,
-    required this.subtitle,
-    required this.amount,
-    required this.account,
-    required this.icon,
-    required this.iconBgColor,
-    required this.iconColor,
-    this.badgeText,
-    this.badgeBgColor,
-    this.badgeTextColor,
-    required this.isIncome,
-    required this.paymentType,
-    required this.monthYear,
-  });
-}
-
 class _ExpensesScreenState extends State<ExpensesScreen> {
-  String _selectedMonth = 'October 2024';
+  String _selectedMonth = 'September 2024';
   String _selectedFilter = 'All'; // 'All', 'Expense', 'Income', 'UPI'
 
   final List<String> _availableMonths = [
-    'October 2024',
     'September 2024',
+    'October 2024',
     'August 2024',
     'July 2024',
   ];
 
-  final List<_ExpenseItemModel> _allTransactions = [
-    // September 2024 / Sample Data for month switcher
-    _ExpenseItemModel(
-      dateGroup: 'TODAY',
-      title: 'Amazon',
-      subtitle: 'Shopping â€¢ UPI â€¢ 10:42 AM',
-      amount: -1299.0,
-      account: 'HDFC â€¢â€¢4021',
-      icon: Icons.shopping_bag_outlined,
-      iconBgColor: const Color(0xFFFEF2F2),
-      iconColor: const Color(0xFFBA1A1A),
-      isIncome: false,
-      paymentType: 'UPI',
-      monthYear: 'September 2024',
-    ),
-    _ExpenseItemModel(
-      dateGroup: 'TODAY',
-      title: 'Rahul',
-      subtitle: 'Food â€¢ UPI â€¢ 09:15 AM',
-      amount: -500.0,
-      account: 'Google Pay',
-      icon: Icons.coffee_outlined,
-      iconBgColor: const Color(0xFFEAEDFF),
-      iconColor: const Color(0xFF4648D4),
-      isIncome: false,
-      paymentType: 'UPI',
-      monthYear: 'September 2024',
-    ),
-    _ExpenseItemModel(
-      dateGroup: 'TODAY',
-      title: 'Swiggy',
-      subtitle: 'Food â€¢ Card â€¢ 01:20 PM',
-      amount: -420.0,
-      account: 'ICICI â€¢â€¢8912',
-      icon: Icons.restaurant_outlined,
-      iconBgColor: const Color(0xFFFEF2F2),
-      iconColor: const Color(0xFFBA1A1A),
-      isIncome: false,
-      paymentType: 'Card',
-      monthYear: 'September 2024',
-    ),
-    _ExpenseItemModel(
-      dateGroup: 'YESTERDAY',
-      title: 'Uber',
-      subtitle: 'Travel â€¢ UPI â€¢ 08:20 PM',
-      amount: -340.0,
-      account: 'Paytm UPI',
-      icon: Icons.directions_car_outlined,
-      iconBgColor: const Color(0xFFEAEDFF),
-      iconColor: const Color(0xFF4648D4),
-      isIncome: false,
-      paymentType: 'UPI',
-      monthYear: 'September 2024',
-    ),
-    _ExpenseItemModel(
-      dateGroup: 'YESTERDAY',
-      title: 'Salary',
-      subtitle: 'Income â€¢ Bank Transfer â€¢ 10:00 AM',
-      amount: 50000.0,
-      account: 'HDFC Salary',
-      icon: Icons.payments_outlined,
-      iconBgColor: const Color(0xFFDCFCE7),
-      iconColor: const Color(0xFF006C49),
-      badgeText: 'Credited',
-      badgeBgColor: const Color(0xFF6CF8BB),
-      badgeTextColor: const Color(0xFF005236),
-      isIncome: true,
-      paymentType: 'Bank Transfer',
-      monthYear: 'September 2024',
-    ),
-  ];
+  List<TransactionModel> _monthTransactions = [];
+  bool _isLoading = true;
 
-  List<_ExpenseItemModel> get _monthTransactions {
-    return _allTransactions.where((t) => t.monthYear == _selectedMonth).toList();
+  @override
+  void initState() {
+    super.initState();
+    _loadTransactions();
   }
 
-  List<_ExpenseItemModel> get _filteredTransactions {
+  Future<void> _loadTransactions() async {
+    try {
+      final list = await TransactionRepository.instance.getTransactionsByMonth(_selectedMonth);
+      if (mounted) {
+        setState(() {
+          _monthTransactions = list;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  List<TransactionModel> get _filteredTransactions {
     final list = _monthTransactions;
     if (_selectedFilter == 'All') return list;
     if (_selectedFilter == 'Expense') return list.where((t) => !t.isIncome).toList();
@@ -211,8 +130,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   onTap: () {
                     setState(() {
                       _selectedMonth = m;
+                      _isLoading = true;
                     });
                     Navigator.pop(ctx);
+                    _loadTransactions();
                   },
                 );
               }),
@@ -229,62 +150,29 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       MaterialPageRoute(builder: (_) => const AddExpenseScreen()),
     );
     if (result != null && result is Map<String, dynamic>) {
-      setState(() {
-        _allTransactions.insert(
-          0,
-          _ExpenseItemModel(
-            dateGroup: 'TODAY',
-            title: result['merchant'] ?? 'Custom Expense',
-            subtitle: '${result['category'] ?? 'General'} \u2022 ${result['payment'] ?? 'UPI'} \u2022 Just now',
-            amount: -(result['amount'] as num).toDouble(),
-            account: result['payment'] ?? 'Default Account',
-            icon: Icons.receipt_long_outlined,
-            iconBgColor: const Color(0xFFFEF2F2),
-            iconColor: const Color(0xFFBA1A1A),
-            isIncome: false,
-            paymentType: result['payment'] ?? 'UPI',
-            monthYear: _selectedMonth,
-          ),
-        );
-      });
+      final amt = (result['amount'] as num).toDouble();
+      final txn = TransactionModel(
+        title: result['merchant'] ?? 'Custom Expense',
+        amount: -amt.abs(),
+        category: result['category'] ?? 'General',
+        dateTime: DateTime.now().toIso8601String(),
+        account: result['payment'] ?? 'Default Account',
+        paymentType: result['payment'] ?? 'UPI',
+        isIncome: false,
+        monthYear: _selectedMonth,
+        notes: result['notes'],
+      );
+      await TransactionRepository.instance.insertTransaction(txn);
+      _loadTransactions();
     }
   }
 
   void _openSmsDetection() async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const SmsDetectionScreen()),
     );
-    if (result != null && result is List<Map<String, dynamic>>) {
-      setState(() {
-        for (final item in result) {
-          _allTransactions.insert(
-            0,
-            _ExpenseItemModel(
-              dateGroup: 'TODAY',
-              title: item['merchant'] ?? 'SMS Expense',
-              subtitle: '${item['category'] ?? 'General'} • ${item['payment'] ?? 'UPI'} • Confirmed SMS',
-              amount: -(item['amount'] as num).toDouble(),
-              account: item['payment'] ?? 'Bank Account',
-              icon: item['category'] == 'Food'
-                  ? Icons.restaurant_outlined
-                  : (item['category'] == 'Shopping'
-                      ? Icons.shopping_bag_outlined
-                      : Icons.receipt_long_outlined),
-              iconBgColor: item['category'] == 'Food'
-                  ? const Color(0xFFEAEDFF)
-                  : const Color(0xFFFEF2F2),
-              iconColor: item['category'] == 'Food'
-                  ? const Color(0xFF4648D4)
-                  : const Color(0xFFBA1A1A),
-              isIncome: false,
-              paymentType: item['payment'] ?? 'UPI',
-              monthYear: _selectedMonth,
-            ),
-          );
-        }
-      });
-    }
+    _loadTransactions();
   }
 
   @override
@@ -308,8 +196,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               _buildSegmentedFilter(),
               const SizedBox(height: 16),
               _buildMetricCards(),
-              const SizedBox(height: 16),
-              if (isEmpty) _buildEmptyStateCard() else _buildPopulatedList(filtered),
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+                )
+              else if (isEmpty)
+                _buildEmptyStateCard()
+              else
+                _buildPopulatedList(filtered),
               const SizedBox(height: 16),
               _buildSmsDetectionBanner(context),
               const SizedBox(height: 32),
@@ -706,7 +601,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 
   // Populated list fallback if transactions exist in selected month
-  Widget _buildPopulatedList(List<_ExpenseItemModel> list) {
+  Widget _buildPopulatedList(List<TransactionModel> list) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,

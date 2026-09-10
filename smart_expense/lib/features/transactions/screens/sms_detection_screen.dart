@@ -1,40 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
-
-class _PendingSmsTransaction {
-  final String id;
-  String merchant;
-  double amount;
-  String paymentMode;
-  String timeString;
-  String timeAgo;
-  String suggestedCategory;
-  IconData categoryIcon;
-  String bankSource;
-  IconData bankIcon;
-  IconData merchantIcon;
-  Color merchantIconBg;
-  Color merchantIconColor;
-  bool isSecondCard; // For button pairing (Edit vs Ignore)
-
-  _PendingSmsTransaction({
-    required this.id,
-    required this.merchant,
-    required this.amount,
-    required this.paymentMode,
-    required this.timeString,
-    required this.timeAgo,
-    required this.suggestedCategory,
-    required this.categoryIcon,
-    required this.bankSource,
-    required this.bankIcon,
-    required this.merchantIcon,
-    required this.merchantIconBg,
-    required this.merchantIconColor,
-    this.isSecondCard = false,
-  });
-}
+import '../../expenses/models/pending_sms_model.dart';
+import '../../expenses/repositories/transaction_repository.dart';
 
 class SmsDetectionScreen extends StatefulWidget {
   const SmsDetectionScreen({super.key});
@@ -44,44 +12,41 @@ class SmsDetectionScreen extends StatefulWidget {
 }
 
 class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
-  final List<_PendingSmsTransaction> _pendingTransactions = [
-    _PendingSmsTransaction(
-      id: 'sms_1',
-      merchant: 'Rahul',
-      amount: 500.0,
-      paymentMode: 'UPI',
-      timeString: '03 Sep, 09:15 AM',
-      timeAgo: 'Just now',
-      suggestedCategory: 'Food',
-      categoryIcon: Icons.restaurant_rounded,
-      bankSource: 'Detected from HDFC Bank SMS',
-      bankIcon: Icons.account_balance_outlined,
-      merchantIcon: Icons.person_outline_rounded,
-      merchantIconBg: const Color(0xFFEAEDFF),
-      merchantIconColor: const Color(0xFF4648D4),
-      isSecondCard: false,
-    ),
-    _PendingSmsTransaction(
-      id: 'sms_2',
-      merchant: 'Amazon',
-      amount: 1299.0,
-      paymentMode: 'Card',
-      timeString: 'Today, 10:42 AM',
-      timeAgo: '12m ago',
-      suggestedCategory: 'Shopping',
-      categoryIcon: Icons.shopping_bag_outlined,
-      bankSource: 'Detected from ICICI Bank SMS',
-      bankIcon: Icons.credit_card_outlined,
-      merchantIcon: Icons.shopping_bag_outlined,
-      merchantIconBg: const Color(0xFF6CF8BB),
-      merchantIconColor: const Color(0xFF006C49),
-      isSecondCard: true,
-    ),
-  ];
-
+  List<PendingSmsModel> _pendingTransactions = [];
+  bool _isLoading = true;
   final List<Map<String, dynamic>> _confirmedList = [];
 
-  void _confirmTransaction(_PendingSmsTransaction tx) {
+  @override
+  void initState() {
+    super.initState();
+    _loadPendingSms();
+  }
+
+  Future<void> _loadPendingSms() async {
+    try {
+      final list = await TransactionRepository.instance.getPendingSms();
+      if (mounted) {
+        setState(() {
+          _pendingTransactions = list;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _confirmTransaction(PendingSmsModel tx) async {
+    await TransactionRepository.instance.confirmSmsTransaction(
+      tx,
+      chosenCategory: tx.suggestedCategory,
+      monthYear: 'September 2024',
+    );
+    if (!mounted) return;
     setState(() {
       _confirmedList.add({
         'merchant': tx.merchant,
@@ -103,7 +68,9 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
     );
   }
 
-  void _ignoreTransaction(_PendingSmsTransaction tx) {
+  void _ignoreTransaction(PendingSmsModel tx) async {
+    await TransactionRepository.instance.dismissPendingSms(tx.id);
+    if (!mounted) return;
     setState(() {
       _pendingTransactions.removeWhere((item) => item.id == tx.id);
     });
@@ -119,7 +86,7 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
     );
   }
 
-  void _showCategoryPicker(_PendingSmsTransaction tx) {
+  void _showCategoryPicker(PendingSmsModel tx) {
     final categories = [
       {'name': 'Food', 'icon': Icons.restaurant_rounded},
       {'name': 'Shopping', 'icon': Icons.shopping_bag_outlined},
@@ -195,7 +162,6 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
                   onTap: () {
                     setState(() {
                       tx.suggestedCategory = c['name'] as String;
-                      tx.categoryIcon = c['icon'] as IconData;
                     });
                     Navigator.pop(ctx);
                   },
@@ -210,7 +176,7 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
 );
   }
 
-  void _showEditSheet(_PendingSmsTransaction tx) {
+  void _showEditSheet(PendingSmsModel tx) {
     final merchantCtrl = TextEditingController(text: tx.merchant);
     final amountCtrl = TextEditingController(text: tx.amount.toInt().toString());
 
@@ -335,7 +301,12 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
               const SizedBox(height: 16),
               _buildAiSmartCaptureBanner(),
               const SizedBox(height: 16),
-              if (_pendingTransactions.isEmpty)
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+                )
+              else if (_pendingTransactions.isEmpty)
                 _buildAllCaughtUpState()
               else
                 ..._pendingTransactions.map((tx) => Padding(
@@ -543,7 +514,7 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
   }
 
   // 4. Pending Transaction Card with Red Accent Stripe
-  Widget _buildTransactionCard(_PendingSmsTransaction tx) {
+  Widget _buildTransactionCard(PendingSmsModel tx) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Container(

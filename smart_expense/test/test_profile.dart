@@ -19,9 +19,8 @@ void main() {
     expect(find.text('Phone (SMS Sync)'), findsOneWidget);
     expect(find.text('+91 98765 24012'), findsOneWidget);
     expect(find.text('Quick PIN'), findsOneWidget);
-    expect(find.text('Biometric Unlock'), findsOneWidget);
-    expect(find.text('144'), findsOneWidget);
-    expect(find.text('2.4 MB'), findsOneWidget);
+    expect(find.text('Transactions'), findsOneWidget);
+    expect(find.text('DB Size'), findsOneWidget);
     expect(find.text('Lock Current Session'), findsOneWidget);
   });
 }

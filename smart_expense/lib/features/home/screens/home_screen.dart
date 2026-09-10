@@ -1,14 +1,87 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../expenses/models/transaction_model.dart';
+import '../../expenses/repositories/transaction_repository.dart';
 import '../../expenses/screens/add_expense_screen.dart';
 import '../../transactions/screens/sms_detection_screen.dart';
 import '../../expenses/screens/expenses_screen.dart';
 import '../../transactions/screens/transaction_details_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final VoidCallback? onViewAllPressed;
 
   const HomeScreen({super.key, this.onViewAllPressed});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  double _totalSpent = 2559.0;
+  double _totalReceived = 50000.0;
+  int _pendingCount = 2;
+  List<TransactionModel> _recentTxns = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHomeData();
+  }
+
+  Future<void> _loadHomeData() async {
+    try {
+      final summary = await TransactionRepository.instance.getMonthSpendSummary('September 2024');
+      final pending = await TransactionRepository.instance.getPendingSms();
+      final allTx = await TransactionRepository.instance.getAllTransactions();
+
+      if (mounted) {
+        setState(() {
+          _totalSpent = summary['spent'] ?? 0.0;
+          _totalReceived = summary['received'] ?? 0.0;
+          _pendingCount = pending.length;
+          _recentTxns = allTx.take(3).toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  String _formatCurrency(int val) {
+    return val.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+  }
+
+  void _openAddExpense() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddExpenseScreen()),
+    );
+    if (result != null && result is Map<String, dynamic>) {
+      final amt = (result['amount'] as num).toDouble();
+      final txn = TransactionModel(
+        title: result['merchant'] ?? 'Custom Expense',
+        amount: -amt.abs(),
+        category: result['category'] ?? 'General',
+        dateTime: DateTime.now().toIso8601String(),
+        account: result['payment'] ?? 'Default Account',
+        paymentType: result['payment'] ?? 'UPI',
+        isIncome: false,
+        monthYear: 'September 2024',
+        notes: result['notes'],
+      );
+      await TransactionRepository.instance.insertTransaction(txn);
+    }
+    _loadHomeData();
+  }
+
+  void _openSmsDetection() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SmsDetectionScreen()),
+    );
+    _loadHomeData();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,12 +161,7 @@ class HomeScreen extends StatelessWidget {
           children: [
             // Notification Bell with unread dot
             GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SmsDetectionScreen()),
-                );
-              },
+              onTap: _openSmsDetection,
               child: Container(
                 width: 40,
                 height: 40,
@@ -109,18 +177,19 @@ class HomeScreen extends StatelessWidget {
                       size: 20,
                       color: AppTheme.textPrimary,
                     ),
-                    Positioned(
-                      top: 9,
-                      right: 10,
-                      child: Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFBA1A1A),
-                          shape: BoxShape.circle,
+                    if (_pendingCount > 0)
+                      Positioned(
+                        top: 9,
+                        right: 10,
+                        child: Container(
+                          width: 7,
+                          height: 7,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFBA1A1A),
+                            shape: BoxShape.circle,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -179,10 +248,12 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
-              '2 new SMS transactions detected',
-              style: TextStyle(
+              _pendingCount > 0
+                  ? '$_pendingCount new SMS transactions detected'
+                  : 'All transactions synchronized',
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: AppTheme.textPrimary,
@@ -191,28 +262,23 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SmsDetectionScreen()),
-              );
-            },
+            onTap: _openSmsDetection,
             borderRadius: BorderRadius.circular(6),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               child: Row(
-                children: const [
+                children: [
                   Text(
-                    'Review',
-                    style: TextStyle(
+                    _pendingCount > 0 ? 'Review' : 'Open',
+                    style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppTheme.primary,
                       fontFamily: 'Inter',
                     ),
                   ),
-                  SizedBox(width: 2),
-                  Icon(
+                  const SizedBox(width: 2),
+                  const Icon(
                     Icons.arrow_forward_rounded,
                     size: 14,
                     color: AppTheme.primary,
@@ -269,9 +335,9 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            '₹31,550',
-            style: TextStyle(
+          Text(
+            '₹${_formatCurrency((_totalReceived - _totalSpent).toInt())}',
+            style: const TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.w700,
               color: AppTheme.textPrimary,
@@ -323,9 +389,9 @@ class HomeScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        '₹50,000',
-                        style: TextStyle(
+                      Text(
+                        '₹${_formatCurrency(_totalReceived.toInt())}',
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF006C49),
@@ -377,9 +443,9 @@ class HomeScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        '₹18,450',
-                        style: TextStyle(
+                      Text(
+                        '₹${_formatCurrency(_totalSpent.toInt())}',
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFFBA1A1A),
@@ -604,33 +670,6 @@ class HomeScreen extends StatelessWidget {
 
   // Recent Transactions Section
   Widget _buildRecentTransactionsSection(BuildContext context) {
-    final transactions = [
-      _TransactionItem(
-        title: 'Amazon',
-        subtitle: 'Shopping • Today, 10:42 AM',
-        amount: '-₹1,299',
-        account: 'ICICI Bank',
-        icon: Icons.shopping_cart_outlined,
-        isExpense: true,
-      ),
-      _TransactionItem(
-        title: 'Rahul',
-        subtitle: 'UPI Transfer • Today, 09:15 AM',
-        amount: '-₹500',
-        account: 'GPay',
-        icon: Icons.north_east_rounded,
-        isExpense: true,
-      ),
-      _TransactionItem(
-        title: 'Salary',
-        subtitle: 'Bank Transfer • Yesterday',
-        amount: '+₹50,000',
-        account: 'HDFC Corp',
-        icon: Icons.payments_outlined,
-        isExpense: false,
-      ),
-    ];
-
     return Column(
       children: [
         Row(
@@ -646,14 +685,15 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             GestureDetector(
-              onTap: () {
-                if (onViewAllPressed != null) {
-                  onViewAllPressed!();
+              onTap: () async {
+                if (widget.onViewAllPressed != null) {
+                  widget.onViewAllPressed!();
                 } else {
-                  Navigator.push(
+                  await Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const ExpensesScreen()),
                   );
+                  _loadHomeData();
                 }
               },
               child: Row(
@@ -679,123 +719,136 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: transactions.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 8),
-          itemBuilder: (context, index) {
-            final tx = transactions[index];
-            return InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => TransactionDetailsScreen(
-                      title: tx.title,
-                      isVerified: true,
-                      category: tx.title == 'Rahul'
-                          ? 'Food & Dining'
-                          : (tx.title == 'Amazon' ? 'Shopping' : 'Income'),
-                      amount: tx.title == 'Salary' ? 50000.0 : (tx.title == 'Amazon' ? -1299.0 : -500.0),
-                      status: tx.title == 'Salary' ? 'Credited to Bank' : 'Completed via UPI',
-                      paymentMethod: tx.title == 'Salary' ? 'Bank Transfer' : 'UPI Transfer',
-                      dateTime: '03 Sep 2026, 09:15 AM',
-                      upiId: '${tx.title.toLowerCase()}@upi',
-                      bankAccount: tx.account,
-                      referenceId: '123456789012',
-                      expenseSource: 'Verified SMS',
-                    ),
-                  ),
-                );
-              },
+        if (_recentTxns.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
               borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.border, width: 1),
-                ),
-                child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: tx.isExpense
-                          ? const Color(0xFFFFE8E8)
-                          : const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.border, width: 1),
+            ),
+            alignment: Alignment.center,
+            child: const Text(
+              'No transactions recorded yet.',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _recentTxns.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final tx = _recentTxns[index];
+              return InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TransactionDetailsScreen(
+                        title: tx.title,
+                        isVerified: true,
+                        category: tx.category,
+                        amount: tx.amount,
+                        status: tx.isIncome
+                            ? 'Completed via Bank Transfer'
+                            : 'Completed via ${tx.paymentType}',
+                        paymentMethod: tx.paymentType,
+                        dateTime: tx.dateGroup,
+                        bankAccount: tx.account,
+                        expenseSource: tx.rawSms != null ? 'Verified SMS' : 'Manual Entry',
+                      ),
                     ),
-                    child: Icon(
-                      tx.icon,
-                      size: 20,
-                      color: tx.isExpense
-                          ? const Color(0xFFBA1A1A)
-                          : const Color(0xFF006C49),
-                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.border, width: 1),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          tx.title,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          tx.subtitle,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: AppTheme.textSecondary,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  child: Row(
                     children: [
-                      Text(
-                        tx.amount,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: tx.isExpense
-                              ? const Color(0xFFBA1A1A)
-                              : const Color(0xFF006C49),
-                          fontFamily: 'Inter',
-                          fontFeatures: const [FontFeature.tabularFigures()],
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: tx.iconBgColor,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          tx.icon,
+                          size: 20,
+                          color: tx.iconColor,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        tx.account,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppTheme.textMuted,
-                          fontFamily: 'Inter',
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              tx.title,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textPrimary,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              tx.subtitle,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: AppTheme.textSecondary,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${tx.isIncome ? '+' : '-'}₹${_formatCurrency(tx.amount.abs().toInt())}',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: tx.isIncome
+                                  ? const Color(0xFF006C49)
+                                  : const Color(0xFFBA1A1A),
+                              fontFamily: 'Inter',
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            tx.account,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textMuted,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-          );
-        },
-        ),
+                ),
+              );
+            },
+          ),
       ],
     );
   }
@@ -806,12 +859,7 @@ class HomeScreen extends StatelessWidget {
       width: double.infinity,
       height: 48,
       child: ElevatedButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AddExpenseScreen()),
-          );
-        },
+        onPressed: _openAddExpense,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppTheme.primary,
           foregroundColor: Colors.white,
@@ -838,23 +886,5 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-class _TransactionItem {
-  final String title;
-  final String subtitle;
-  final String amount;
-  final String account;
-  final IconData icon;
-  final bool isExpense;
-
-  const _TransactionItem({
-    required this.title,
-    required this.subtitle,
-    required this.amount,
-    required this.account,
-    required this.icon,
-    required this.isExpense,
-  });
 }
 

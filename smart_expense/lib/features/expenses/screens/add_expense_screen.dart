@@ -781,11 +781,21 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       child: ElevatedButton(
         onPressed: () {
           final amt = _amount > 0 ? _amount : 500.0;
-          Navigator.pop(context);
+          Navigator.pop(context, {
+            'merchant': _merchantController.text.trim().isNotEmpty
+                ? _merchantController.text.trim()
+                : 'Expense',
+            'amount': amt,
+            'category': _selectedCategory,
+            'payment': _selectedPaymentMethod,
+            'notes': _notesController.text.trim(),
+            'date': _selectedDate,
+            'time': _selectedTime,
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Saved expense: ₹${amt.toStringAsFixed(2)} for ${_merchantController.text}',
+                'Saved expense: \u20B9${amt.toStringAsFixed(2)} for ${_merchantController.text}',
               ),
               backgroundColor: AppTheme.primary,
               duration: const Duration(seconds: 2),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/screens/login_screen.dart';
+import '../../expenses/repositories/transaction_repository.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,6 +16,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _displayName = 'Hiren';
   String _lastBackupTime = 'Yesterday, 11:30 PM';
   int _backupCount = 3;
+  int _transactionCount = 8;
+  double _dbSizeMb = 0.05;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDbStats();
+  }
+
+  Future<void> _loadDbStats() async {
+    try {
+      final stats = await TransactionRepository.instance.getDatabaseStats();
+      if (mounted) {
+        setState(() {
+          _transactionCount = stats['count'] as int;
+          _dbSizeMb = stats['dbSizeMb'] as double;
+        });
+      }
+    } catch (_) {}
+  }
 
   void _handleCreateBackup() {
     HapticFeedback.lightImpact();
@@ -817,8 +838,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
-                        children: const [
-                          Text(
+                        children: [
+                          const Text(
                             'Transactions',
                             style: TextStyle(
                               fontFamily: 'Inter',
@@ -827,10 +848,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: Color(0xFF767586),
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
-                            '144',
-                            style: TextStyle(
+                            '$_transactionCount',
+                            style: const TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
@@ -850,8 +871,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
-                        children: const [
-                          Text(
+                        children: [
+                          const Text(
                             'DB Size',
                             style: TextStyle(
                               fontFamily: 'Inter',
@@ -860,10 +881,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: Color(0xFF767586),
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
-                            '2.4 MB',
-                            style: TextStyle(
+                            '${_dbSizeMb.toStringAsFixed(2)} MB',
+                            style: const TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
