@@ -276,8 +276,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AutomaticDetectionScreen()),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               children: [
                 Container(
@@ -351,6 +358,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
+        ),
           const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
           _buildSettingsRow(
             icon: Icons.fact_check_outlined,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/sms_parser_service.dart';
 
 class AutomaticDetectionScreen extends StatefulWidget {
   final VoidCallback? onBack;
@@ -16,8 +17,61 @@ class _AutomaticDetectionScreenState extends State<AutomaticDetectionScreen> {
   bool _storeOriginalSms = false;
   bool _isSyncing = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _checkInitialPermissions();
+  }
+
+  Future<void> _checkInitialPermissions() async {
+    final granted = await SmsParserService.instance.checkPermissions();
+    if (mounted) {
+      setState(() {
+        _smsDetection = granted;
+      });
+    }
+  }
+
   int get _configuredCount {
-    return 3;
+    return _smsDetection ? 3 : 2;
+  }
+
+  Future<void> _onToggleSmsDetection(bool val) async {
+    if (val) {
+      final granted = await SmsParserService.instance.requestPermissions();
+      if (!mounted) return;
+      if (granted) {
+        setState(() => _smsDetection = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('SMS Real-time Detection enabled', style: TextStyle(fontFamily: 'Inter')),
+              ],
+            ),
+            backgroundColor: AppTheme.secondary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        setState(() => _smsDetection = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('SMS permission denied. Please allow SMS access to detect expenses.'),
+            backgroundColor: AppTheme.tertiary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } else {
+      setState(() => _smsDetection = false);
+    }
   }
 
   void _handleSync() async {
@@ -25,31 +79,50 @@ class _AutomaticDetectionScreenState extends State<AutomaticDetectionScreen> {
       _isSyncing = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 1200));
+    final addedCount = await SmsParserService.instance.syncInboxMessages(limit: 60);
 
     if (!mounted) return;
     setState(() {
       _isSyncing = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-            SizedBox(width: 8),
-            Text(
-              'Synced 2 recent SMS alerts successfully',
-              style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w500),
-            ),
-          ],
+    if (addedCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                'Synced $addedCount new transaction SMS alerts!',
+                style: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          backgroundColor: AppTheme.secondary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
         ),
-        backgroundColor: AppTheme.secondary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      );
+    } else {
+      final hasPermission = await SmsParserService.instance.checkPermissions();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            hasPermission
+                ? 'Inbox scanned. No new bank/UPI transaction SMS found.'
+                : 'SMS permission is required to scan your inbox.',
+            style: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w500),
+          ),
+          backgroundColor: hasPermission ? AppTheme.primary : AppTheme.tertiary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   void _showAuditDialog() {
@@ -150,25 +223,44 @@ class _AutomaticDetectionScreenState extends State<AutomaticDetectionScreen> {
     );
   }
 
-  void _showPermissionsInfo() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.shield_outlined, color: Colors.white, size: 18),
-            SizedBox(width: 8),
-            Text(
-              'SMS & Notification permissions are active',
-              style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w500),
-            ),
-          ],
+  void _showPermissionsInfo() async {
+    final granted = await SmsParserService.instance.checkPermissions();
+    if (!mounted) return;
+    if (granted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.shield_outlined, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text(
+                'SMS permissions are active and verified',
+                style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          backgroundColor: AppTheme.secondary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 2),
         ),
-        backgroundColor: AppTheme.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      );
+    } else {
+      final requested = await SmsParserService.instance.requestPermissions();
+      if (!mounted) return;
+      if (requested) {
+        setState(() => _smsDetection = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('SMS permission granted successfully!'),
+            backgroundColor: AppTheme.secondary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -502,7 +594,7 @@ class _AutomaticDetectionScreenState extends State<AutomaticDetectionScreen> {
             title: 'SMS Detection',
             subtitle: 'Scan incoming banking alerts',
             value: _smsDetection,
-            onChanged: (val) => setState(() => _smsDetection = val),
+            onChanged: (val) => _onToggleSmsDetection(val),
           ),
           const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
           _buildToggleRow(

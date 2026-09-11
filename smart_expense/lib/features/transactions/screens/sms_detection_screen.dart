@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/sms_parser_service.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../expenses/models/pending_sms_model.dart';
 import '../../expenses/repositories/transaction_repository.dart';
@@ -14,12 +16,71 @@ class SmsDetectionScreen extends StatefulWidget {
 class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
   List<PendingSmsModel> _pendingTransactions = [];
   bool _isLoading = true;
+  bool _isScanningInbox = false;
   final List<Map<String, dynamic>> _confirmedList = [];
+  StreamSubscription<PendingSmsModel>? _smsSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadPendingSms();
+    _setupRealtimeSmsListener();
+  }
+
+  void _setupRealtimeSmsListener() {
+    _smsSubscription = SmsParserService.instance.onIncomingSms.listen((newSms) {
+      if (!mounted) return;
+      setState(() {
+        _pendingTransactions.insert(0, newSms);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.flash_on_rounded, color: Colors.amber, size: 18),
+              const SizedBox(width: 8),
+              Text('Live SMS Detected: \u20B9${newSms.amount.toInt()} at ${newSms.merchant}!'),
+            ],
+          ),
+          backgroundColor: const Color(0xFF131B2E),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _smsSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _scanInboxNow() async {
+    setState(() {
+      _isScanningInbox = true;
+    });
+    final added = await SmsParserService.instance.syncInboxMessages(limit: 60);
+    await _loadPendingSms();
+    if (!mounted) return;
+    setState(() {
+      _isScanningInbox = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          added > 0
+              ? 'Synced $added new transaction SMS alerts from inbox!'
+              : 'Inbox scanned. No new transaction SMS found.',
+        ),
+        backgroundColor: added > 0 ? const Color(0xFF006C49) : AppTheme.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _loadPendingSms() async {
@@ -422,36 +483,76 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
             ),
           ],
         ),
-        // Pending Count Pill
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFDAD6),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFB61722),
-                  shape: BoxShape.circle,
+        Row(
+          children: [
+            InkWell(
+              onTap: _isScanningInbox ? null : _scanInboxNow,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isScanningInbox)
+                      const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+                      )
+                    else
+                      const Icon(Icons.sync_rounded, size: 14, color: AppTheme.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      _isScanningInbox ? 'Scanning...' : 'Scan Inbox',
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 6),
-              Text(
-                '${_pendingTransactions.length} Pending',
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFB61722),
-                ),
+            ),
+            const SizedBox(width: 8),
+            // Pending Count Pill
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFDAD6),
+                borderRadius: BorderRadius.circular(20),
               ),
-            ],
-          ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFB61722),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${_pendingTransactions.length} Pending',
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFB61722),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );
