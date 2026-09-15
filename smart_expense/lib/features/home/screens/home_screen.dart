@@ -23,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   double _totalSpent = 0.0;
   double _totalReceived = 0.0;
   int _pendingCount = 0;
+  PendingSmsModel? _latestPending;
   List<TransactionModel> _recentTxns = [];
   StreamSubscription<PendingSmsModel>? _smsSubscription;
 
@@ -58,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _totalSpent = summary['spent'] ?? 0.0;
           _totalReceived = summary['received'] ?? 0.0;
           _pendingCount = pending.length;
+          _latestPending = pending.isNotEmpty ? pending.first : null;
           _recentTxns = allTx.take(3).toList();
         });
       }
@@ -241,69 +243,262 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // SMS Transaction Detection Alert Banner
   Widget _buildSmsDetectionBanner(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppTheme.surfaceContainerHigh,
-          width: 1,
+    if (_pendingCount == 0 || _latestPending == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppTheme.surfaceContainerHigh,
+            width: 1,
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: const Icon(
-              Icons.chat_bubble_outline_rounded,
-              size: 18,
-              color: AppTheme.primary,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              _pendingCount > 0
-                  ? '$_pendingCount new SMS transactions detected'
-                  : 'All transactions synchronized',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
-                fontFamily: 'Inter',
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: const Icon(
+                Icons.check_circle_outline_rounded,
+                size: 18,
+                color: AppTheme.secondary,
               ),
             ),
-          ),
-          InkWell(
-            onTap: _openSmsDetection,
-            borderRadius: BorderRadius.circular(6),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              child: Row(
-                children: [
-                  Text(
-                    _pendingCount > 0 ? 'Review' : 'Open',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.primary,
-                      fontFamily: 'Inter',
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'All transactions synchronized',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ),
+            InkWell(
+              onTap: _openSmsDetection,
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Row(
+                  children: const [
+                    Text(
+                      'Open',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primary,
+                        fontFamily: 'Inter',
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 2),
-                  const Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 14,
-                    color: AppTheme.primary,
-                  ),
-                ],
+                    SizedBox(width: 2),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 14,
+                      color: AppTheme.primary,
+                    ),
+                  ],
+                ),
               ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final p = _latestPending!;
+    final amtFormatted = p.amount == p.amount.roundToDouble()
+        ? p.amount.toInt().toString()
+        : p.amount.toStringAsFixed(2);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x59DA3437), width: 1.5),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x10DA3437),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Header Strip: LATEST TRANSACTION DETECTED
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFDAD6),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.flash_on_rounded, size: 16, color: Color(0xFFB61722)),
+                    SizedBox(width: 5),
+                    Text(
+                      'LATEST DEBIT DETECTED',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: Color(0xFFB61722),
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  p.timeAgo,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFB61722),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Content Details
+          Padding(
+            padding: const EdgeInsets.all(14.0),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF2F3FF),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              p.categoryIcon,
+                              color: AppTheme.primary,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  p.merchant,
+                                  style: const TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${p.bankSource} • ${p.paymentMode}',
+                                  style: const TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 12,
+                                    color: Color(0xFF767586),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '-₹$amtFormatted',
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFBA1A1A),
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4648D4),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          elevation: 0,
+                        ),
+                        onPressed: () async {
+                          await TransactionRepository.instance.confirmSmsTransaction(
+                            p,
+                            chosenCategory: p.suggestedCategory,
+                            monthYear: 'September 2024',
+                          );
+                          _loadHomeData();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('✓ ₹$amtFormatted confirmed into expenses!'),
+                                backgroundColor: const Color(0xFF006C49),
+                                behavior: SnackBarBehavior.floating,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.check_rounded, size: 16, color: Colors.white),
+                        label: const Text(
+                          'Confirm Expense',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                        side: const BorderSide(color: Color(0xFFC7C4D7)),
+                      ),
+                      onPressed: _openSmsDetection,
+                      child: Text(
+                        _pendingCount > 1 ? 'View All ($_pendingCount)' : 'Details',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],

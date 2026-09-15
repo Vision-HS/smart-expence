@@ -99,6 +99,7 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
   Future<void> _loadPendingSms() async {
     try {
       final list = await TransactionRepository.instance.getPendingSms();
+      list.sort((a, b) => b.id.compareTo(a.id));
       if (mounted) {
         setState(() {
           _pendingTransactions = list;
@@ -383,9 +384,9 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
               else if (_pendingTransactions.isEmpty)
                 _buildAllCaughtUpState()
               else
-                ..._pendingTransactions.map((tx) => Padding(
+                ..._pendingTransactions.asMap().entries.map((entry) => Padding(
                       padding: const EdgeInsets.only(bottom: 16.0),
-                      child: _buildTransactionCard(tx),
+                      child: _buildTransactionCard(entry.value, isFirst: entry.key == 0),
                     )),
               const SizedBox(height: 24),
             ],
@@ -628,23 +629,41 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
   }
 
   // 4. Pending Transaction Card with Red Accent Stripe
-  Widget _buildTransactionCard(PendingSmsModel tx) {
+  Widget _buildTransactionCard(PendingSmsModel tx, {bool isFirst = false}) {
+    final amtFormatted = tx.amount >= 1000
+        ? _formatNumber(tx.amount)
+        : (tx.amount == tx.amount.roundToDouble()
+            ? tx.amount.toInt().toString()
+            : tx.amount.toStringAsFixed(2));
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(
+            color: isFirst ? const Color(0xFFDA3437) : const Color(0xFFE2E8F0),
+            width: isFirst ? 2 : 1,
+          ),
+          boxShadow: isFirst
+              ? const [
+                  BoxShadow(
+                    color: Color(0x1ADA3437),
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Stack(
           children: [
-            // Solid Red Left Edge Stripe (4px)
+            // Solid Red Left Edge Stripe (6px for first, 4px for others)
             Positioned(
               left: 0,
               top: 0,
               bottom: 0,
-              width: 4,
+              width: isFirst ? 6 : 4,
               child: Container(
                 color: const Color(0xFFDA3437),
               ),
@@ -654,36 +673,37 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Row 1: "New transaction detected" (red) + Timestamp
+                  // Row 1: "LATEST DEBIT TRANSACTION" (if first) vs "New transaction detected" + Timestamp
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
-                        children: const [
+                        children: [
                           Icon(
-                            Icons.sms_outlined,
+                            isFirst ? Icons.flash_on_rounded : Icons.sms_outlined,
                             size: 16,
-                            color: Color(0xFFDA3437),
+                            color: const Color(0xFFDA3437),
                           ),
-                          SizedBox(width: 6),
+                          const SizedBox(width: 6),
                           Text(
-                            'New transaction detected',
+                            isFirst ? 'LATEST DEBIT TRANSACTION' : 'New transaction detected',
                             style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFFDA3437),
+                              fontWeight: isFirst ? FontWeight.w800 : FontWeight.w600,
+                              color: const Color(0xFFDA3437),
+                              letterSpacing: isFirst ? 0.3 : 0,
                             ),
                           ),
                         ],
                       ),
                       Text(
                         tx.timeAgo,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF767586),
+                          fontWeight: isFirst ? FontWeight.w700 : FontWeight.w500,
+                          color: isFirst ? const Color(0xFFDA3437) : const Color(0xFF767586),
                         ),
                       ),
                     ],
@@ -740,7 +760,7 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            '-\u20B9${tx.amount >= 1000 ? _formatNumber(tx.amount) : tx.amount.toInt()}',
+                            '-\u20B9$amtFormatted',
                             style: const TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 22,

@@ -73,8 +73,13 @@ class TransactionRepository {
   // Pending SMS Queue
   Future<List<PendingSmsModel>> getPendingSms() async {
     final db = await _dbHelper.database;
-    final List<Map<String, dynamic>> maps = await db.query('pending_sms');
-    return List.generate(maps.length, (i) => PendingSmsModel.fromMap(maps[i]));
+    final List<Map<String, dynamic>> maps = await db.query(
+      'pending_sms',
+      orderBy: 'id DESC',
+    );
+    final list = List.generate(maps.length, (i) => PendingSmsModel.fromMap(maps[i]));
+    list.sort((a, b) => b.id.compareTo(a.id));
+    return list;
   }
 
   Future<int> insertPendingSms(PendingSmsModel sms) async {
