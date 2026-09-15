@@ -80,6 +80,59 @@ void main() {
       expect(result.bankSource, 'Axis Bank');
     });
 
+    test('Parses IDFC FIRST Bank credit SMS correctly without false Cred merchant', () {
+      const smsBody =
+          'Your A/C XXXXX049213 is credited with INR 1.00 on 15/09/26 12:30. Your new balance is INR 25,003.00. Team IDFC FIRST Bank';
+      const sender = 'VM-IDFCFB';
+
+      final result = parser.parseSms(
+        body: smsBody,
+        sender: sender,
+        timestamp: now,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.amount, 1.0);
+      expect(result.isIncome, true);
+      expect(result.isCredit, true);
+      expect(result.merchant, isNot('Cred'));
+      expect(result.bankSource, 'IDFC FIRST Bank');
+    });
+
+    test('Parses Salary Credit SMS properly as Income', () {
+      const smsBody =
+          'Salary of INR 75,000.00 credited to your A/c XX4321 from TECH CORP on 31-AUG-24. Avail bal INR 90,000.00';
+      const sender = 'AD-HDFCBK';
+
+      final result = parser.parseSms(
+        body: smsBody,
+        sender: sender,
+        timestamp: now,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.amount, 75000.0);
+      expect(result.isIncome, true);
+      expect(result.suggestedCategory, 'Salary');
+    });
+
+    test('Distinguishes actual CRED app debit payment from credited SMS', () {
+      const smsBody =
+          'Rs. 5,000.00 debited from A/C XX1234 on 12-09-24 towards CRED club. Ref 987654';
+      const sender = 'VM-HDFCBK';
+
+      final result = parser.parseSms(
+        body: smsBody,
+        sender: sender,
+        timestamp: now,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.amount, 5000.0);
+      expect(result.isIncome, false);
+      expect(result.merchant.toLowerCase(), 'cred');
+    });
+
     test('Skips promotional or security OTP messages', () {
       const otpSms =
           'Your OTP for logging into netbanking is 849201. Do not share this OTP with anyone. Valid for 10 mins.';

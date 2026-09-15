@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
+import '../database/database_helper.dart';
 import '../../features/expenses/models/pending_sms_model.dart';
 import '../../features/expenses/repositories/transaction_repository.dart';
 
@@ -123,20 +124,28 @@ class SmsParserService {
         {'limit': limit},
       );
 
-      if (rawMessages == null || rawMessages.isEmpty) return 0;
+      if (rawMessages == null || rawMessages.isEmpty) {
+        return 0;
+      }
+
+      // Purge any misparsed 'Cred' records so they get correctly categorized as Credit/Bank
+      try {
+        final db = await DatabaseHelper.instance.database;
+        await db.delete('pending_sms', where: "merchant = 'Cred'");
+      } catch (_) {}
 
       final existingPending =
           await TransactionRepository.instance.getPendingSms();
       final existingTxns =
           await TransactionRepository.instance.getAllTransactions();
 
-      // Deduplication set using amount and merchant/body
+      // Deduplication set using amount, merchant, and isIncome
       final existingKeys = <String>{};
       for (final p in existingPending) {
-        existingKeys.add('${p.amount.toInt()}_${p.merchant.toLowerCase()}');
+        existingKeys.add('${p.amount.toInt()}_${p.merchant.toLowerCase()}_${p.isIncome}');
       }
       for (final t in existingTxns) {
-        existingKeys.add('${t.amount.abs().toInt()}_${t.title.toLowerCase()}');
+        existingKeys.add('${t.amount.abs().toInt()}_${t.title.toLowerCase()}_${t.isIncome}');
       }
 
       int newlyAdded = 0;
@@ -155,7 +164,7 @@ class SmsParserService {
           );
 
           if (parsed != null) {
-            final key = '${parsed.amount.toInt()}_${parsed.merchant.toLowerCase()}';
+            final key = '${parsed.amount.toInt()}_${parsed.merchant.toLowerCase()}_${parsed.isIncome}';
             if (!existingKeys.contains(key)) {
               await TransactionRepository.instance.insertPendingSms(parsed);
               existingKeys.add(key);
@@ -248,24 +257,38 @@ class SmsParserService {
 
     if (amount == null || amount <= 0) return null;
 
-    // 3. Extract Merchant / Payee
-    String merchant = _extractMerchant(body, lowerBody);
+    // 3. Detect Credit (Income) vs Debit (Expense)
+    final bool isIncome = _detectIsIncome(body, lowerBody);
 
     // 4. Extract Bank Source
-    String bankSource = _extractBankSource(sender, body);
+    final String bankSource = _extractBankSource(sender, body);
 
-    // 5. Categorize
-    String category = _categorize(merchant, lowerBody);
+    // 5. Extract Merchant / Payee
+    final String merchant = _extractMerchant(
+      body,
+      lowerBody,
+      bankSource: bankSource,
+      isIncome: isIncome,
+    );
 
-    // 6. Payment Mode (UPI vs Card vs NetBanking vs Bank Transfer)
+    // 6. Categorize
+    final String category = isIncome
+        ? (lowerBody.contains('salary')
+            ? 'Salary'
+            : (lowerBody.contains('cashback')
+                ? 'Cashback'
+                : (lowerBody.contains('refund') ? 'Refund' : 'Income')))
+        : _categorize(merchant, lowerBody);
+
+    // 7. Payment Mode (UPI vs Card vs NetBanking vs Bank Transfer)
     String paymentMode = 'UPI';
     if (lowerBody.contains('card') || lowerBody.contains('credit card') || lowerBody.contains('debit card') || lowerBody.contains('pos')) {
       paymentMode = 'Card';
-    } else if (lowerBody.contains('netbanking') || lowerBody.contains('imps') || lowerBody.contains('neft') || lowerBody.contains('rtgs')) {
-      paymentMode = 'NetBanking';
+    } else if (lowerBody.contains('netbanking') || lowerBody.contains('imps') || lowerBody.contains('neft') || lowerBody.contains('rtgs') || isIncome) {
+      paymentMode = isIncome ? 'Bank Transfer' : 'NetBanking';
     }
 
-    // 7. Format Date / Time
+    // 8. Format Date / Time
     final dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
     final timeString =
         '${_formatTwoDigits(dateTime.hour)}:${_formatTwoDigits(dateTime.minute)}';
@@ -283,10 +306,79 @@ class SmsParserService {
       suggestedCategory: category,
       bankSource: bankSource,
       isSecondCard: paymentMode == 'Card',
+      isIncome: isIncome,
     );
   }
 
-  String _extractMerchant(String body, String lowerBody) {
+  bool _detectIsIncome(String body, String lowerBody) {
+    final hasCreditKeyword = lowerBody.contains('credited') ||
+        lowerBody.contains('credit of') ||
+        lowerBody.contains('credit by') ||
+        lowerBody.contains('credit with') ||
+        lowerBody.contains('has a credit') ||
+        lowerBody.contains('received') ||
+        lowerBody.contains('deposited') ||
+        lowerBody.contains('refund') ||
+        lowerBody.contains('cashback') ||
+        lowerBody.contains('salary') ||
+        lowerBody.contains('reversed');
+
+    final hasDebitKeyword = lowerBody.contains('debited') ||
+        lowerBody.contains('debit of') ||
+        lowerBody.contains('debited by') ||
+        lowerBody.contains('debited with') ||
+        lowerBody.contains('spent') ||
+        lowerBody.contains('paid') ||
+        lowerBody.contains('sent to') ||
+        lowerBody.contains('withdrawn') ||
+        lowerBody.contains('deducted') ||
+        lowerBody.contains('purchase') ||
+        lowerBody.contains('auto-debit');
+
+    if (hasCreditKeyword && !hasDebitKeyword) return true;
+    if (hasDebitKeyword && !hasCreditKeyword) return false;
+
+    // Both present: check which keyword appears first in message
+    final cIdx = lowerBody.indexOf('credit');
+    final dIdx = lowerBody.indexOf('debit');
+    if (cIdx != -1 && dIdx != -1) {
+      return cIdx < dIdx;
+    }
+    return hasCreditKeyword;
+  }
+
+  String _extractMerchant(
+    String body,
+    String lowerBody, {
+    String? bankSource,
+    bool isIncome = false,
+  }) {
+    if (isIncome) {
+      // 1. Credit / Income: Search for sender/source
+      final transferRegex = RegExp(
+        r'(?:transfer from|trf from|received from|from|credit by|credited by|nach-)\s+([A-Za-z0-9\s*.\-_&@]+?)(?:\s+of|\s+on|\s+ref|\s+upi|\s+avl|\.|\,|$)',
+        caseSensitive: false,
+      );
+      final tMatch = transferRegex.firstMatch(body);
+      if (tMatch != null) {
+        String name = tMatch.group(1)?.trim() ?? '';
+        name = name.replaceAll(RegExp(r'^(the|a|an)\s+', caseSensitive: false), '');
+        name = name.replaceAll(RegExp(r'^nach-\s*', caseSensitive: false), '');
+        if (name.isNotEmpty && name.length <= 32 && !name.toLowerCase().contains('account')) {
+          return _titleCase(name);
+        }
+      }
+
+      if (lowerBody.contains('salary')) return 'Salary Credit';
+      if (lowerBody.contains('refund')) return 'Refund';
+      if (lowerBody.contains('cashback')) return 'Cashback';
+
+      if (bankSource != null && bankSource.isNotEmpty && bankSource != 'Bank') {
+        return '$bankSource Credit';
+      }
+      return 'Account Credit';
+    }
+
     // 1. Direct famous brand check
     if (lowerBody.contains('swiggy')) return 'Swiggy';
     if (lowerBody.contains('zomato')) return 'Zomato';
@@ -321,7 +413,8 @@ class SmsParserService {
     if (lowerBody.contains('google pay') || lowerBody.contains('gpay')) return 'Google Pay';
     if (lowerBody.contains('phonepe')) return 'PhonePe';
     if (lowerBody.contains('paytm')) return 'Paytm';
-    if (lowerBody.contains('cred')) return 'Cred';
+    // Precise Cred app matching (avoiding "credit" / "credited")
+    if (RegExp(r'\bcred\b', caseSensitive: false).hasMatch(body) && !lowerBody.contains('credit')) return 'CRED';
 
     // 2. Regex heuristics for payee / merchant in text
     final merchantRegex = RegExp(

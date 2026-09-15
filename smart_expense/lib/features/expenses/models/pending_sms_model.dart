@@ -8,8 +8,9 @@ class PendingSmsModel {
   String timeString;
   String timeAgo;
   String suggestedCategory;
-  String bankSource;
+  final String bankSource;
   bool isSecondCard;
+  final bool isIncome;
 
   PendingSmsModel({
     required this.id,
@@ -21,6 +22,7 @@ class PendingSmsModel {
     required this.suggestedCategory,
     required this.bankSource,
     this.isSecondCard = false,
+    this.isIncome = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -34,6 +36,7 @@ class PendingSmsModel {
       'suggestedCategory': suggestedCategory,
       'bankSource': bankSource,
       'isSecondCard': isSecondCard ? 1 : 0,
+      'isIncome': isIncome ? 1 : 0,
     };
   }
 
@@ -48,6 +51,7 @@ class PendingSmsModel {
       suggestedCategory: map['suggestedCategory'] as String? ?? 'General',
       bankSource: map['bankSource'] as String? ?? 'SMS',
       isSecondCard: (map['isSecondCard'] as int? ?? 0) == 1,
+      isIncome: (map['isIncome'] as int? ?? 0) == 1,
     );
   }
 
@@ -61,6 +65,7 @@ class PendingSmsModel {
     String? suggestedCategory,
     String? bankSource,
     bool? isSecondCard,
+    bool? isIncome,
   }) {
     return PendingSmsModel(
       id: id ?? this.id,
@@ -72,8 +77,14 @@ class PendingSmsModel {
       suggestedCategory: suggestedCategory ?? this.suggestedCategory,
       bankSource: bankSource ?? this.bankSource,
       isSecondCard: isSecondCard ?? this.isSecondCard,
+      isIncome: isIncome ?? this.isIncome,
     );
   }
+
+  bool get isCredit => isIncome;
+  bool get isDebit => !isIncome;
+  Color get transactionColor => isIncome ? const Color(0xFF006C49) : const Color(0xFFB61722);
+  String get typeLabel => isIncome ? 'CREDIT' : 'DEBIT';
 
   // UI Presentation Helpers
   IconData get categoryIcon {

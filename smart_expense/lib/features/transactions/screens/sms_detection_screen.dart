@@ -19,6 +19,20 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
   bool _isScanningInbox = false;
   final List<Map<String, dynamic>> _confirmedList = [];
   StreamSubscription<PendingSmsModel>? _smsSubscription;
+  int _selectedFilterTab = 0; // 0: All, 1: Debited, 2: Credited
+
+  int get _debitCount => _pendingTransactions.where((t) => !t.isIncome).length;
+  int get _creditCount => _pendingTransactions.where((t) => t.isIncome).length;
+
+  List<PendingSmsModel> get _displayedTransactions {
+    if (_selectedFilterTab == 1) {
+      return _pendingTransactions.where((t) => !t.isIncome).toList();
+    }
+    if (_selectedFilterTab == 2) {
+      return _pendingTransactions.where((t) => t.isIncome).toList();
+    }
+    return _pendingTransactions;
+  }
 
   @override
   void initState() {
@@ -132,9 +146,10 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
       _pendingTransactions.removeWhere((item) => item.id == tx.id);
     });
 
+    final preposition = tx.isIncome ? 'received from' : 'to';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('✓ \u20B9${tx.amount.toInt()} to ${tx.merchant} confirmed!'),
+        content: Text('✓ \u20B9${tx.amount.toInt()} $preposition ${tx.merchant} confirmed!'),
         backgroundColor: const Color(0xFF006C49),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
@@ -376,15 +391,17 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
               const SizedBox(height: 16),
               _buildAiSmartCaptureBanner(),
               const SizedBox(height: 16),
+              _buildFilterTabs(),
+              const SizedBox(height: 16),
               if (_isLoading)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 40),
                   child: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
                 )
-              else if (_pendingTransactions.isEmpty)
+              else if (_displayedTransactions.isEmpty)
                 _buildAllCaughtUpState()
               else
-                ..._pendingTransactions.asMap().entries.map((entry) => Padding(
+                ..._displayedTransactions.asMap().entries.map((entry) => Padding(
                       padding: const EdgeInsets.only(bottom: 16.0),
                       child: _buildTransactionCard(entry.value, isFirst: entry.key == 0),
                     )),
@@ -628,13 +645,88 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
     );
   }
 
-  // 4. Pending Transaction Card with Red Accent Stripe
+  // 3.5 Filter Tabs: All, Debited, Credited
+  Widget _buildFilterTabs() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F4FA),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          _buildTabItem(0, 'All', _pendingTransactions.length, Icons.all_inclusive_rounded, const Color(0xFF4648D4)),
+          _buildTabItem(1, 'Debited', _debitCount, Icons.arrow_upward_rounded, const Color(0xFFDA3437)),
+          _buildTabItem(2, 'Credited', _creditCount, Icons.arrow_downward_rounded, const Color(0xFF006C49)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabItem(int index, String label, int count, IconData icon, Color activeColor) {
+    final isSelected = _selectedFilterTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedFilterTab = index;
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected ? activeColor : const Color(0xFF767586),
+              ),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  '$label ($count)',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12.5,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? activeColor : const Color(0xFF767586),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 4. Pending Transaction Card with Red/Green Accent Stripe
   Widget _buildTransactionCard(PendingSmsModel tx, {bool isFirst = false}) {
     final amtFormatted = tx.amount >= 1000
         ? _formatNumber(tx.amount)
         : (tx.amount == tx.amount.roundToDouble()
             ? tx.amount.toInt().toString()
             : tx.amount.toStringAsFixed(2));
+    final isIncome = tx.isIncome;
+    final accentColor = isIncome ? const Color(0xFF006C49) : const Color(0xFFDA3437);
+    final lightBg = isIncome ? const Color(0xFFE6F7F0) : const Color(0xFFFFDAD6);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
@@ -643,29 +735,29 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isFirst ? const Color(0xFFDA3437) : const Color(0xFFE2E8F0),
+            color: isFirst ? accentColor : const Color(0xFFE2E8F0),
             width: isFirst ? 2 : 1,
           ),
           boxShadow: isFirst
-              ? const [
+              ? [
                   BoxShadow(
-                    color: Color(0x1ADA3437),
+                    color: accentColor.withValues(alpha: 0.12),
                     blurRadius: 10,
-                    offset: Offset(0, 4),
+                    offset: const Offset(0, 4),
                   ),
                 ]
               : null,
         ),
         child: Stack(
           children: [
-            // Solid Red Left Edge Stripe (6px for first, 4px for others)
+            // Left Edge Accent Stripe (Green for Credit, Red for Debit)
             Positioned(
               left: 0,
               top: 0,
               bottom: 0,
               width: isFirst ? 6 : 4,
               child: Container(
-                color: const Color(0xFFDA3437),
+                color: accentColor,
               ),
             ),
             Padding(
@@ -673,44 +765,61 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Row 1: "LATEST DEBIT TRANSACTION" (if first) vs "New transaction detected" + Timestamp
+                  // Row 1: "LATEST CREDIT/DEBIT TRANSACTION" + Time ago + Close/Dismiss
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
                         children: [
                           Icon(
-                            isFirst ? Icons.flash_on_rounded : Icons.sms_outlined,
+                            isFirst
+                                ? Icons.flash_on_rounded
+                                : (isIncome ? Icons.south_west_rounded : Icons.north_east_rounded),
                             size: 16,
-                            color: const Color(0xFFDA3437),
+                            color: accentColor,
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            isFirst ? 'LATEST DEBIT TRANSACTION' : 'New transaction detected',
+                            isFirst
+                                ? (isIncome ? 'LATEST CREDIT TRANSACTION' : 'LATEST DEBIT TRANSACTION')
+                                : (isIncome ? 'Credit alert detected' : 'Debit alert detected'),
                             style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 13,
                               fontWeight: isFirst ? FontWeight.w800 : FontWeight.w600,
-                              color: const Color(0xFFDA3437),
+                              color: accentColor,
                               letterSpacing: isFirst ? 0.3 : 0,
                             ),
                           ),
                         ],
                       ),
-                      Text(
-                        tx.timeAgo,
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12.5,
-                          fontWeight: isFirst ? FontWeight.w700 : FontWeight.w500,
-                          color: isFirst ? const Color(0xFFDA3437) : const Color(0xFF767586),
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            tx.timeAgo,
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12.5,
+                              fontWeight: isFirst ? FontWeight.w700 : FontWeight.w500,
+                              color: isFirst ? accentColor : const Color(0xFF767586),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () => _ignoreTransaction(tx),
+                            borderRadius: BorderRadius.circular(12),
+                            child: const Padding(
+                              padding: EdgeInsets.all(2.0),
+                              child: Icon(Icons.close_rounded, size: 16, color: Color(0xFF9E9E9E)),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
 
-                  // Row 2: Merchant Avatar + Name & Time + Amount & DEBIT
+                  // Row 2: Merchant Avatar + Name & Time + Amount & CREDIT/DEBIT badge
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -720,12 +829,12 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: tx.merchantIconBg,
+                              color: isIncome ? const Color(0xFFE6F7F0) : tx.merchantIconBg,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
-                              tx.merchantIcon,
-                              color: tx.merchantIconColor,
+                              isIncome ? Icons.account_balance_wallet_rounded : tx.merchantIcon,
+                              color: isIncome ? const Color(0xFF006C49) : tx.merchantIconColor,
                               size: 22,
                             ),
                           ),
@@ -760,24 +869,31 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            '-\u20B9$amtFormatted',
-                            style: const TextStyle(
+                            '${isIncome ? '+' : '-'}\u20B9$amtFormatted',
+                            style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFFB61722),
+                              color: isIncome ? const Color(0xFF006C49) : const Color(0xFFB61722),
                               letterSpacing: -0.5,
                             ),
                           ),
                           const SizedBox(height: 2),
-                          const Text(
-                            'DEBIT',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF767586),
-                              letterSpacing: 0.5,
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: lightBg,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              tx.typeLabel,
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: accentColor,
+                                letterSpacing: 0.5,
+                              ),
                             ),
                           ),
                         ],
@@ -847,31 +963,31 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Row 5: Action Buttons (Confirm + Edit or Confirm + Ignore)
+                  // Row 5: Action Buttons (Confirm Income/Expense + Edit)
                   Row(
                     children: [
-                      // Confirm Button (Blue)
+                      // Confirm Button
                       Expanded(
                         child: GestureDetector(
                           onTap: () => _confirmTransaction(tx),
                           child: Container(
                             height: 42,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF4648D4),
+                              color: isIncome ? const Color(0xFF006C49) : const Color(0xFF4648D4),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.check_rounded,
                                   color: Colors.white,
                                   size: 18,
                                 ),
-                                SizedBox(width: 6),
+                                const SizedBox(width: 6),
                                 Text(
-                                  'Confirm',
-                                  style: TextStyle(
+                                  isIncome ? 'Confirm Income' : 'Confirm Expense',
+                                  style: const TextStyle(
                                     fontFamily: 'Inter',
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -884,38 +1000,32 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // Secondary Button: Edit (for Card 1) or Ignore (for Card 2)
+                      // Edit Button
                       Expanded(
                         child: GestureDetector(
-                          onTap: () {
-                            if (!tx.isSecondCard) {
-                              _showEditSheet(tx);
-                            } else {
-                              _ignoreTransaction(tx);
-                            }
-                          },
+                          onTap: () => _showEditSheet(tx),
                           child: Container(
                             height: 42,
                             decoration: BoxDecoration(
-                              color: !tx.isSecondCard ? const Color(0xFFEAEDFF) : const Color(0xFFF2F3FF),
+                              color: const Color(0xFFEAEDFF),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Row(
+                            child: const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  !tx.isSecondCard ? Icons.edit_outlined : Icons.close_rounded,
-                                  color: !tx.isSecondCard ? const Color(0xFF131B2E) : const Color(0xFF464554),
+                                  Icons.edit_outlined,
+                                  color: Color(0xFF131B2E),
                                   size: 18,
                                 ),
-                                const SizedBox(width: 6),
+                                SizedBox(width: 6),
                                 Text(
-                                  !tx.isSecondCard ? 'Edit' : 'Ignore',
+                                  'Edit',
                                   style: TextStyle(
                                     fontFamily: 'Inter',
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
-                                    color: !tx.isSecondCard ? const Color(0xFF131B2E) : const Color(0xFF464554),
+                                    color: Color(0xFF131B2E),
                                   ),
                                 ),
                               ],
@@ -936,6 +1046,18 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
 
   // 5. Empty State when all pending transactions are confirmed or dismissed
   Widget _buildAllCaughtUpState() {
+    String emptyTitle = 'All caught up!';
+    String emptySubtitle =
+        'No pending SMS transactions. Auto-Sync is actively monitoring incoming bank & UPI alerts in real-time.';
+
+    if (_selectedFilterTab == 1) {
+      emptyTitle = 'No pending Debits';
+      emptySubtitle = 'There are no pending debit transactions waiting for confirmation.';
+    } else if (_selectedFilterTab == 2) {
+      emptyTitle = 'No pending Credits';
+      emptySubtitle = 'There are no pending credit/income transactions waiting for confirmation.';
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
@@ -960,9 +1082,9 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
             ),
           ),
           const SizedBox(height: 18),
-          const Text(
-            'All caught up!',
-            style: TextStyle(
+          Text(
+            emptyTitle,
+            style: const TextStyle(
               fontFamily: 'Inter',
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -970,10 +1092,10 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'No pending SMS transactions. Auto-Sync is actively monitoring incoming bank & UPI alerts in real-time.',
+          Text(
+            emptySubtitle,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'Inter',
               fontSize: 13,
               height: 1.4,

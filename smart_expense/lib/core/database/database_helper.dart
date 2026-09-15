@@ -58,7 +58,8 @@ class DatabaseHelper {
         timeAgo TEXT NOT NULL,
         suggestedCategory TEXT NOT NULL,
         bankSource TEXT NOT NULL,
-        isSecondCard INTEGER NOT NULL DEFAULT 0
+        isSecondCard INTEGER NOT NULL DEFAULT 0,
+        isIncome INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -180,6 +181,9 @@ class DatabaseHelper {
         'pending_sms',
         where: "id IN ('sms_1', 'sms_2', 'sms_sep_01', 'sms_sep_02') OR merchant IN ('Rahul', 'Amazon')",
       );
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE pending_sms ADD COLUMN isIncome INTEGER NOT NULL DEFAULT 0');
     } catch (_) {}
   }
 

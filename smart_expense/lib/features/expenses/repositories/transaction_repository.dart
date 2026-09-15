@@ -110,12 +110,12 @@ class TransactionRepository {
 
     final txn = TransactionModel(
       title: finalMerchant,
-      amount: -finalAmount.abs(),
+      amount: sms.isIncome ? finalAmount.abs() : -finalAmount.abs(),
       category: finalCategory,
       dateTime: DateTime.now().toIso8601String(),
-      account: sms.paymentMode == 'Card' ? 'ICICI ••8912' : 'Google Pay',
+      account: sms.bankSource,
       paymentType: sms.paymentMode,
-      isIncome: false,
+      isIncome: sms.isIncome,
       monthYear: targetMonth,
       rawSms: '${sms.bankSource}: $finalMerchant ₹$finalAmount',
     );

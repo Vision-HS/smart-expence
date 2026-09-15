@@ -316,56 +316,67 @@ class _HomeScreenState extends State<HomeScreen> {
     final amtFormatted = p.amount == p.amount.roundToDouble()
         ? p.amount.toInt().toString()
         : p.amount.toStringAsFixed(2);
+    final isCredit = p.isIncome;
+    final headerBg = isCredit ? const Color(0xFFE6F7F0) : const Color(0xFFFFDAD6);
+    final headerTextColor = isCredit ? const Color(0xFF006C49) : const Color(0xFFB61722);
+    final headerTitle = isCredit ? 'LATEST CREDIT DETECTED' : 'LATEST DEBIT DETECTED';
+    final headerIcon = isCredit ? Icons.arrow_downward_rounded : Icons.flash_on_rounded;
+    final amountColor = isCredit ? const Color(0xFF006C49) : const Color(0xFFBA1A1A);
+    final confirmButtonColor = isCredit ? const Color(0xFF006C49) : const Color(0xFF4648D4);
+    final confirmText = isCredit ? 'Confirm Income' : 'Confirm Expense';
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0x59DA3437), width: 1.5),
-        boxShadow: const [
+        border: Border.all(
+          color: isCredit ? const Color(0x59006C49) : const Color(0x59DA3437),
+          width: 1.5,
+        ),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x10DA3437),
+            color: isCredit ? const Color(0x10006C49) : const Color(0x10DA3437),
             blurRadius: 10,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Header Strip: LATEST TRANSACTION DETECTED
+          // Top Header Strip
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFDAD6),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+            decoration: BoxDecoration(
+              color: headerBg,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
-                  children: const [
-                    Icon(Icons.flash_on_rounded, size: 16, color: Color(0xFFB61722)),
-                    SizedBox(width: 5),
+                  children: [
+                    Icon(headerIcon, size: 16, color: headerTextColor),
+                    const SizedBox(width: 5),
                     Text(
-                      'LATEST DEBIT DETECTED',
+                      headerTitle,
                       style: TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 11.5,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.5,
-                        color: Color(0xFFB61722),
+                        color: headerTextColor,
                       ),
                     ),
                   ],
                 ),
                 Text(
                   p.timeAgo,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFFB61722),
+                    color: headerTextColor,
                   ),
                 ),
               ],
@@ -386,12 +397,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             width: 42,
                             height: 42,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF2F3FF),
+                              color: isCredit ? const Color(0xFFE6F7F0) : const Color(0xFFF2F3FF),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
-                              p.categoryIcon,
-                              color: AppTheme.primary,
+                              isCredit ? Icons.account_balance_wallet_rounded : p.categoryIcon,
+                              color: isCredit ? const Color(0xFF006C49) : AppTheme.primary,
                               size: 22,
                             ),
                           ),
@@ -426,12 +437,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     Text(
-                      '-₹$amtFormatted',
-                      style: const TextStyle(
+                      '${isCredit ? '+' : '-'}₹$amtFormatted',
+                      style: TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFFBA1A1A),
+                        color: amountColor,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -443,7 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4648D4),
+                          backgroundColor: confirmButtonColor,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           elevation: 0,
@@ -458,7 +469,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('✓ ₹$amtFormatted confirmed into expenses!'),
+                                content: Text('✓ ₹$amtFormatted ${isCredit ? 'income' : 'expense'} confirmed!'),
                                 backgroundColor: const Color(0xFF006C49),
                                 behavior: SnackBarBehavior.floating,
                                 duration: const Duration(seconds: 2),
@@ -467,9 +478,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           }
                         },
                         icon: const Icon(Icons.check_rounded, size: 16, color: Colors.white),
-                        label: const Text(
-                          'Confirm Expense',
-                          style: TextStyle(
+                        label: Text(
+                          confirmText,
+                          style: const TextStyle(
                             fontFamily: 'Inter',
                             fontWeight: FontWeight.w600,
                             fontSize: 13,
