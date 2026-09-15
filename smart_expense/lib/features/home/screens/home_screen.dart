@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/sms_parser_service.dart';
+import '../../expenses/models/pending_sms_model.dart';
 import '../../expenses/models/transaction_model.dart';
 import '../../expenses/repositories/transaction_repository.dart';
 import '../../expenses/screens/add_expense_screen.dart';
@@ -17,15 +20,31 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  double _totalSpent = 2559.0;
-  double _totalReceived = 50000.0;
-  int _pendingCount = 2;
+  double _totalSpent = 0.0;
+  double _totalReceived = 0.0;
+  int _pendingCount = 0;
   List<TransactionModel> _recentTxns = [];
+  StreamSubscription<PendingSmsModel>? _smsSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadHomeData();
+    _setupRealtimeListener();
+  }
+
+  void _setupRealtimeListener() {
+    _smsSubscription = SmsParserService.instance.onIncomingSms.listen((_) {
+      if (mounted) {
+        _loadHomeData();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _smsSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadHomeData() async {

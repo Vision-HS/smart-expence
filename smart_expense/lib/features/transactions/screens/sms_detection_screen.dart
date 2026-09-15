@@ -25,6 +25,19 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
     super.initState();
     _loadPendingSms();
     _setupRealtimeSmsListener();
+    _autoSyncInbox();
+  }
+
+  Future<void> _autoSyncInbox() async {
+    try {
+      final granted = await SmsParserService.instance.checkPermissions();
+      if (granted) {
+        final added = await SmsParserService.instance.syncInboxMessages(limit: 150);
+        if (added > 0 && mounted) {
+          await _loadPendingSms();
+        }
+      }
+    } catch (_) {}
   }
 
   void _setupRealtimeSmsListener() {
@@ -39,7 +52,7 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
             children: [
               const Icon(Icons.flash_on_rounded, color: Colors.amber, size: 18),
               const SizedBox(width: 8),
-              Text('Live SMS Detected: \u20B9${newSms.amount.toInt()} at ${newSms.merchant}!'),
+              Text('Live SMS Detected: ₹${newSms.amount.toInt()} at ${newSms.merchant}!'),
             ],
           ),
           backgroundColor: const Color(0xFF131B2E),
@@ -61,7 +74,7 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
     setState(() {
       _isScanningInbox = true;
     });
-    final added = await SmsParserService.instance.syncInboxMessages(limit: 60);
+    final added = await SmsParserService.instance.syncInboxMessages(limit: 150);
     await _loadPendingSms();
     if (!mounted) return;
     setState(() {
@@ -905,7 +918,7 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
   Widget _buildAllCaughtUpState() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -926,7 +939,7 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
               size: 32,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
           const Text(
             'All caught up!',
             style: TextStyle(
@@ -938,36 +951,64 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'No pending SMS transactions. We will notify you when new bank alerts arrive.',
+            'No pending SMS transactions. Auto-Sync is actively monitoring incoming bank & UPI alerts in real-time.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'Inter',
-              fontSize: 13.5,
+              fontSize: 13,
               height: 1.4,
               color: Color(0xFF767586),
             ),
           ),
-          const SizedBox(height: 24),
-          GestureDetector(
-            onTap: () {
-              Navigator.pop(context, _confirmedList.isNotEmpty ? _confirmedList : null);
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF4648D4),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'Back to Expenses',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _isScanningInbox ? null : _scanInboxNow,
+                icon: _isScanningInbox
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+                      )
+                    : const Icon(Icons.sync_rounded, size: 16, color: AppTheme.primary),
+                label: Text(
+                  _isScanningInbox ? 'Scanning...' : 'Scan Inbox',
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primary,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFC0C1FF)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context, _confirmedList.isNotEmpty ? _confirmedList : null);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4648D4),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                child: const Text(
+                  'Back to Expenses',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

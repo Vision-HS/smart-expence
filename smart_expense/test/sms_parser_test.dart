@@ -38,9 +38,9 @@ void main() {
 
       expect(result, isNotNull);
       expect(result!.amount, 1200.0);
-      expect(result.merchant, 'Uber India');
+      expect(result.merchant, 'Uber');
       expect(result.suggestedCategory, 'Travel');
-      expect(result.bankSource, 'SBI Bank');
+      expect(result.bankSource, 'State Bank of India');
     });
 
     test('Parses ICICI Bank Shopping SMS correctly', () {
@@ -56,10 +56,28 @@ void main() {
 
       expect(result, isNotNull);
       expect(result!.amount, 2499.0);
-      expect(result.merchant, 'Amazon India');
+      expect(result.merchant, 'Amazon');
       expect(result.suggestedCategory, 'Shopping');
       expect(result.bankSource, 'ICICI Bank');
       expect(result.paymentMode, 'Card');
+    });
+
+    test('Parses Axis Bank Zomato payment SMS with slash-hyphen amount', () {
+      const smsBody =
+          'Rs. 350/- debited from Axis Bank A/c no. XX9999 towards Zomato on 14-09-24 via UPI.';
+      const sender = 'AX-AXISBK';
+
+      final result = parser.parseSms(
+        body: smsBody,
+        sender: sender,
+        timestamp: now,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.amount, 350.0);
+      expect(result.merchant, 'Zomato');
+      expect(result.suggestedCategory, 'Food');
+      expect(result.bankSource, 'Axis Bank');
     });
 
     test('Skips promotional or security OTP messages', () {

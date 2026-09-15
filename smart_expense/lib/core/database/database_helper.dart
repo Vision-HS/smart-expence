@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../features/expenses/models/transaction_model.dart';
-import '../../features/expenses/models/pending_sms_model.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -20,11 +19,13 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(
+    final db = await openDatabase(
       path,
       version: 1,
       onCreate: _createDB,
     );
+    await _cleanupLegacyDummyData(db);
+    return db;
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -170,37 +171,16 @@ class DatabaseHelper {
       batch.insert('transactions', tx.toMap());
     }
 
-    // Seed Pending SMS queue
-    final initialSms = [
-      PendingSmsModel(
-        id: 'sms_1',
-        merchant: 'Rahul',
-        amount: 500.0,
-        paymentMode: 'UPI',
-        timeString: '03 Sep, 09:15 AM',
-        timeAgo: 'Just now',
-        suggestedCategory: 'Food',
-        bankSource: 'Detected from HDFC Bank SMS',
-        isSecondCard: false,
-      ),
-      PendingSmsModel(
-        id: 'sms_2',
-        merchant: 'Amazon',
-        amount: 1299.0,
-        paymentMode: 'Card',
-        timeString: 'Today, 10:42 AM',
-        timeAgo: '12m ago',
-        suggestedCategory: 'Shopping',
-        bankSource: 'Detected from ICICI Bank SMS',
-        isSecondCard: true,
-      ),
-    ];
-
-    for (final sms in initialSms) {
-      batch.insert('pending_sms', sms.toMap());
-    }
-
     await batch.commit(noResult: true);
+  }
+
+  Future<void> _cleanupLegacyDummyData(Database db) async {
+    try {
+      await db.delete(
+        'pending_sms',
+        where: "id IN ('sms_1', 'sms_2', 'sms_sep_01', 'sms_sep_02') OR merchant IN ('Rahul', 'Amazon')",
+      );
+    } catch (_) {}
   }
 
   Future<int> getTransactionCount() async {

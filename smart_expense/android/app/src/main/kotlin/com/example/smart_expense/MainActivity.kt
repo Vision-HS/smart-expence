@@ -45,9 +45,13 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "readInboxSms" -> {
-                    val limit = call.argument<Int>("limit") ?: 50
+                    val limit = call.argument<Int>("limit") ?: 100
                     val smsList = readInboxMessages(limit)
                     result.success(smsList)
+                }
+                "getBufferedSms" -> {
+                    val buffered = SmsReceiver.getAndClearBufferedMessages(this)
+                    result.success(buffered)
                 }
                 else -> result.notImplemented()
             }

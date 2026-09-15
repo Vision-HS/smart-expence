@@ -63,26 +63,60 @@ class SmsParserService {
           );
 
           if (parsed != null) {
-            // Save to pending SQLite queue
             await TransactionRepository.instance.insertPendingSms(parsed);
             _streamController?.add(parsed);
           }
         }
       },
-      onError: (err) {
-        // Stream error handler
-      },
+      onError: (_) {},
     );
   }
 
-  /// Scan existing SMS inbox and parse transactions into SQLite
-  Future<int> syncInboxMessages({int limit = 60}) async {
+  /// Check and process any SMS messages received while the app was offline/closed
+  Future<int> syncBufferedMessages() async {
+    try {
+      final List<dynamic>? buffered =
+          await _methodChannel.invokeMethod('getBufferedSms');
+      if (buffered == null || buffered.isEmpty) return 0;
+
+      int count = 0;
+      for (final raw in buffered) {
+        if (raw is Map) {
+          final sender = raw['sender']?.toString() ?? '';
+          final body = raw['body']?.toString() ?? '';
+          final timestamp = (raw['timestamp'] as num?)?.toInt() ??
+              DateTime.now().millisecondsSinceEpoch;
+
+          final parsed = parseSms(
+            body: body,
+            sender: sender,
+            timestamp: timestamp,
+          );
+
+          if (parsed != null) {
+            await TransactionRepository.instance.insertPendingSms(parsed);
+            _streamController?.add(parsed);
+            count++;
+          }
+        }
+      }
+      return count;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Scan existing SMS inbox and parse real transactions into SQLite
+  Future<int> syncInboxMessages({int limit = 150}) async {
     try {
       final hasPermission = await checkPermissions();
       if (!hasPermission) {
         final granted = await requestPermissions();
         if (!granted) return 0;
       }
+
+      // First sync any buffered offline messages
+      await syncBufferedMessages();
 
       final List<dynamic>? rawMessages = await _methodChannel.invokeMethod(
         'readInboxSms',
@@ -91,11 +125,19 @@ class SmsParserService {
 
       if (rawMessages == null || rawMessages.isEmpty) return 0;
 
-      final existingList =
+      final existingPending =
           await TransactionRepository.instance.getPendingSms();
-      final existingKeys = existingList
-          .map((e) => '${e.amount}_${e.merchant}_${e.timeString}')
-          .toSet();
+      final existingTxns =
+          await TransactionRepository.instance.getAllTransactions();
+
+      // Deduplication set using amount and merchant/body
+      final existingKeys = <String>{};
+      for (final p in existingPending) {
+        existingKeys.add('${p.amount.toInt()}_${p.merchant.toLowerCase()}');
+      }
+      for (final t in existingTxns) {
+        existingKeys.add('${t.amount.abs().toInt()}_${t.title.toLowerCase()}');
+      }
 
       int newlyAdded = 0;
 
@@ -113,7 +155,7 @@ class SmsParserService {
           );
 
           if (parsed != null) {
-            final key = '${parsed.amount}_${parsed.merchant}_${parsed.timeString}';
+            final key = '${parsed.amount.toInt()}_${parsed.merchant.toLowerCase()}';
             if (!existingKeys.contains(key)) {
               await TransactionRepository.instance.insertPendingSms(parsed);
               existingKeys.add(key);
@@ -129,47 +171,78 @@ class SmsParserService {
     }
   }
 
-  /// Robust Regex Parser for Indian Banks & UPI Messages
+  /// Comprehensive Regex Parser for Indian Banks & UPI Messages
   PendingSmsModel? parseSms({
     required String body,
     required String sender,
     required int timestamp,
   }) {
+    if (body.isEmpty) return null;
     final lowerBody = body.toLowerCase();
 
-    // 1. Skip non-financial SMS (e.g. Pure OTPs without debit/credit)
+    // 1. Skip non-financial SMS (e.g. pure OTPs without transaction indicators)
     final isOtp = lowerBody.contains('otp') ||
         lowerBody.contains('verification code') ||
         lowerBody.contains('one time password') ||
-        lowerBody.contains('do not share');
+        lowerBody.contains('login code') ||
+        lowerBody.contains('secret code');
 
     final isFinancial = lowerBody.contains('debited') ||
+        lowerBody.contains('debit') ||
         lowerBody.contains('spent') ||
+        lowerBody.contains('spend') ||
         lowerBody.contains('paid') ||
+        lowerBody.contains('pay') ||
+        lowerBody.contains('payment') ||
         lowerBody.contains('withdrawn') ||
+        lowerBody.contains('withdraw') ||
         lowerBody.contains('credited') ||
+        lowerBody.contains('credit') ||
         lowerBody.contains('transferred') ||
+        lowerBody.contains('transfer') ||
+        lowerBody.contains('sent') ||
+        lowerBody.contains('received') ||
+        lowerBody.contains('receive') ||
+        lowerBody.contains('deducted') ||
+        lowerBody.contains('purchase') ||
         lowerBody.contains('txn') ||
+        lowerBody.contains('transaction') ||
         lowerBody.contains('vpa') ||
-        lowerBody.contains('upi');
+        lowerBody.contains('upi') ||
+        lowerBody.contains('imps') ||
+        lowerBody.contains('neft') ||
+        lowerBody.contains('rtgs') ||
+        lowerBody.contains('pos') ||
+        lowerBody.contains('auto-debit');
 
     if (isOtp && !isFinancial) return null;
     if (!isFinancial) return null;
 
     // 2. Extract Amount
     double? amount;
-    final amountRegex = RegExp(
-      r'(?:(?:Rs\.?|INR|\u20B9)\s*([\d,]+(?:\.\d{1,2})?)|(?:debited|spent|paid|withdrawn|credited|transferred)\s+(?:by|for|of)?\s*(?:Rs\.?|INR|\u20B9)?\s*([\d,]+(?:\.\d{1,2})?))',
-      caseSensitive: false,
-    );
 
-    final amountMatch = amountRegex.firstMatch(body);
-    if (amountMatch != null) {
-      final strVal = (amountMatch.group(1) ?? amountMatch.group(2))
-          ?.replaceAll(',', '')
-          .trim();
-      if (strVal != null) {
-        amount = double.tryParse(strVal);
+    // Regex handles:
+    // - Rs. 500, Rs.500/-, Rs 1,200.50
+    // - INR 450, INR 1,499.00
+    // - ₹350, ₹ 1,200
+    // - debited by Rs 400, paid 250, spent INR 500
+    final amountPatterns = [
+      RegExp(r'(?:Rs\.?|INR|\u20B9)\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
+      RegExp(r'(?:debited|spent|paid|withdrawn|credited|transferred|sent|deducted|payment of|txn of)\s+(?:by|for|of|with)?\s*(?:Rs\.?|INR|\u20B9)?\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
+      RegExp(r'([\d,]+(?:\.\d{1,2})?)\s*(?:Rs\.?|INR|\u20B9)?\s*(?:debited|spent|paid|withdrawn|credited|transferred|deducted)', caseSensitive: false),
+    ];
+
+    for (final pattern in amountPatterns) {
+      final match = pattern.firstMatch(body);
+      if (match != null) {
+        final str = match.group(1)?.replaceAll(',', '').replaceAll('/-', '').trim();
+        if (str != null) {
+          final parsedAmt = double.tryParse(str);
+          if (parsedAmt != null && parsedAmt > 0) {
+            amount = parsedAmt;
+            break;
+          }
+        }
       }
     }
 
@@ -184,11 +257,11 @@ class SmsParserService {
     // 5. Categorize
     String category = _categorize(merchant, lowerBody);
 
-    // 6. Payment Mode (UPI vs Card vs NetBanking)
+    // 6. Payment Mode (UPI vs Card vs NetBanking vs Bank Transfer)
     String paymentMode = 'UPI';
-    if (lowerBody.contains('card') || lowerBody.contains('credit card') || lowerBody.contains('debit card')) {
+    if (lowerBody.contains('card') || lowerBody.contains('credit card') || lowerBody.contains('debit card') || lowerBody.contains('pos')) {
       paymentMode = 'Card';
-    } else if (lowerBody.contains('netbanking') || lowerBody.contains('imps') || lowerBody.contains('neft')) {
+    } else if (lowerBody.contains('netbanking') || lowerBody.contains('imps') || lowerBody.contains('neft') || lowerBody.contains('rtgs')) {
       paymentMode = 'NetBanking';
     }
 
@@ -214,56 +287,96 @@ class SmsParserService {
   }
 
   String _extractMerchant(String body, String lowerBody) {
-    // Look for: at <Merchant> or to <Merchant> or info: <Merchant> or towards <Merchant>
+    // 1. Direct famous brand check
+    if (lowerBody.contains('swiggy')) return 'Swiggy';
+    if (lowerBody.contains('zomato')) return 'Zomato';
+    if (lowerBody.contains('uber')) return 'Uber';
+    if (lowerBody.contains('ola')) return 'Ola Cabs';
+    if (lowerBody.contains('rapido')) return 'Rapido';
+    if (lowerBody.contains('blinkit')) return 'Blinkit';
+    if (lowerBody.contains('zepto')) return 'Zepto';
+    if (lowerBody.contains('instamart')) return 'Instamart';
+    if (lowerBody.contains('bigbasket')) return 'BigBasket';
+    if (lowerBody.contains('amazon')) return 'Amazon';
+    if (lowerBody.contains('flipkart')) return 'Flipkart';
+    if (lowerBody.contains('myntra')) return 'Myntra';
+    if (lowerBody.contains('ajio')) return 'Ajio';
+    if (lowerBody.contains('meesho')) return 'Meesho';
+    if (lowerBody.contains('nykaa')) return 'Nykaa';
+    if (lowerBody.contains('netflix')) return 'Netflix';
+    if (lowerBody.contains('spotify')) return 'Spotify';
+    if (lowerBody.contains('hotstar')) return 'Disney+ Hotstar';
+    if (lowerBody.contains('prime video')) return 'Prime Video';
+    if (lowerBody.contains('bookmyshow')) return 'BookMyShow';
+    if (lowerBody.contains('pvr')) return 'PVR Cinemas';
+    if (lowerBody.contains('inox')) return 'INOX';
+    if (lowerBody.contains('irctc')) return 'IRCTC';
+    if (lowerBody.contains('makemytrip')) return 'MakeMyTrip';
+    if (lowerBody.contains('goibibo')) return 'Goibibo';
+    if (lowerBody.contains('dmart')) return 'DMart';
+    if (lowerBody.contains('reliance retail') || lowerBody.contains('smart bazaar')) return 'Reliance Smart';
+    if (lowerBody.contains('zudio')) return 'Zudio';
+    if (lowerBody.contains('airtel')) return 'Airtel';
+    if (lowerBody.contains('jio')) return 'Jio Recharge';
+    if (lowerBody.contains('google pay') || lowerBody.contains('gpay')) return 'Google Pay';
+    if (lowerBody.contains('phonepe')) return 'PhonePe';
+    if (lowerBody.contains('paytm')) return 'Paytm';
+    if (lowerBody.contains('cred')) return 'Cred';
+
+    // 2. Regex heuristics for payee / merchant in text
     final merchantRegex = RegExp(
-      r'(?:at|to|info\s*:?|towards|vpa|paid to)\s+([A-Za-z0-9\s*.\-_&]+?)(?:\s+on|\s+ref|\s+upi|\s+avl|\s+bal|\s+via|\s+thru|\.|\,|$)',
+      r'(?:at|to|info\s*:?|towards|vpa|paid to|sent to|transfer to|trf to)\s+([A-Za-z0-9\s*.\-_&@]+?)(?:\s+on|\s+ref|\s+upi|\s+avl|\s+bal|\s+via|\s+thru|\s+using|\.|\,|$)',
       caseSensitive: false,
     );
 
     final match = merchantRegex.firstMatch(body);
     if (match != null) {
       String m = match.group(1)?.trim() ?? '';
-      // Clean up common words
+
+      // Clean up common noise: UPI/DR/..., VPA..., A/c
       m = m.replaceAll(RegExp(r'^(the|a|an)\s+', caseSensitive: false), '');
-      if (m.isNotEmpty && m.length <= 30 && !m.toLowerCase().contains('account') && !m.toLowerCase().contains('card')) {
+      m = m.replaceAll(RegExp(r'^upi\s*/\s*(?:dr|cr)?\s*/?\s*', caseSensitive: false), '');
+      m = m.replaceAll(RegExp(r'^vpa\s*:?\s*', caseSensitive: false), '');
+
+      if (m.isNotEmpty &&
+          m.length <= 30 &&
+          !m.toLowerCase().contains('account') &&
+          !m.toLowerCase().contains('card') &&
+          !m.toLowerCase().contains('balance') &&
+          !m.toLowerCase().contains('avl')) {
         return _titleCase(m);
       }
     }
-
-    // Fallbacks based on famous apps / keywords
-    if (lowerBody.contains('swiggy')) return 'Swiggy';
-    if (lowerBody.contains('zomato')) return 'Zomato';
-    if (lowerBody.contains('uber')) return 'Uber';
-    if (lowerBody.contains('ola')) return 'Ola Cabs';
-    if (lowerBody.contains('amazon')) return 'Amazon';
-    if (lowerBody.contains('flipkart')) return 'Flipkart';
-    if (lowerBody.contains('blinkit')) return 'Blinkit';
-    if (lowerBody.contains('zepto')) return 'Zepto';
-    if (lowerBody.contains('paytm')) return 'Paytm Payment';
-    if (lowerBody.contains('google pay') || lowerBody.contains('gpay')) return 'Google Pay';
-    if (lowerBody.contains('phonepe')) return 'PhonePe';
 
     return 'Merchant / UPI';
   }
 
   String _extractBankSource(String sender, String body) {
-    final upperSender = sender.toUpperCase();
-    final upperBody = body.toUpperCase();
+    final s = sender.toUpperCase();
+    final b = body.toUpperCase();
 
-    if (upperSender.contains('HDFC') || upperBody.contains('HDFC')) return 'HDFC Bank';
-    if (upperSender.contains('SBI') || upperBody.contains('SBI')) return 'SBI Bank';
-    if (upperSender.contains('ICICI') || upperBody.contains('ICICI')) return 'ICICI Bank';
-    if (upperSender.contains('AXIS') || upperBody.contains('AXIS')) return 'Axis Bank';
-    if (upperSender.contains('KOTAK') || upperBody.contains('KOTAK')) return 'Kotak Mahindra';
-    if (upperSender.contains('PNB') || upperBody.contains('PUNJAB')) return 'PNB';
-    if (upperSender.contains('BOB') || upperBody.contains('BARODA')) return 'Bank of Baroda';
-    if (upperSender.contains('PAYTM') || upperBody.contains('PAYTM')) return 'Paytm Bank';
-    if (upperSender.contains('IDFC') || upperBody.contains('IDFC')) return 'IDFC First';
-    if (upperSender.contains('CANARA') || upperBody.contains('CANARA')) return 'Canara Bank';
-    if (upperSender.contains('UNION') || upperBody.contains('UNION BANK')) return 'Union Bank';
-    if (upperSender.contains('YES') || upperBody.contains('YES BANK')) return 'Yes Bank';
+    if (s.contains('HDFC') || b.contains('HDFC')) return 'HDFC Bank';
+    if (s.contains('SBI') || b.contains('SBI') || b.contains('STATE BANK')) return 'State Bank of India';
+    if (s.contains('ICICI') || b.contains('ICICI')) return 'ICICI Bank';
+    if (s.contains('AXIS') || b.contains('AXIS')) return 'Axis Bank';
+    if (s.contains('KOTAK') || b.contains('KOTAK')) return 'Kotak Mahindra';
+    if (s.contains('PNB') || b.contains('PUNJAB NATIONAL')) return 'Punjab National Bank';
+    if (s.contains('BOB') || b.contains('BANK OF BARODA')) return 'Bank of Baroda';
+    if (s.contains('CANARA') || b.contains('CANBNK') || b.contains('CANARA BANK')) return 'Canara Bank';
+    if (s.contains('UNION') || b.contains('UNION BANK')) return 'Union Bank';
+    if (s.contains('INDUS') || b.contains('INDUSIND')) return 'IndusInd Bank';
+    if (s.contains('IDFC') || b.contains('IDFC FIRST')) return 'IDFC FIRST Bank';
+    if (s.contains('YES') || b.contains('YES BANK')) return 'Yes Bank';
+    if (s.contains('BOI') || b.contains('BANK OF INDIA')) return 'Bank of India';
+    if (s.contains('FEDERAL') || b.contains('FEDBNK')) return 'Federal Bank';
+    if (s.contains('RBL') || b.contains('RBLBNK')) return 'RBL Bank';
+    if (s.contains('PAYTM') || b.contains('PAYTM BANK')) return 'Paytm Payments Bank';
+    if (s.contains('AIRTEL') || b.contains('AIRTEL BANK')) return 'Airtel Payments Bank';
+    if (s.contains('CITI') || b.contains('CITIBANK')) return 'Citibank';
+    if (s.contains('SCB') || b.contains('STANDARD CHARTERED')) return 'Standard Chartered';
+    if (s.contains('HSBC') || b.contains('HSBC BANK')) return 'HSBC';
 
-    return 'Bank Alert';
+    return 'Bank SMS';
   }
 
   String _categorize(String merchant, String lowerBody) {
@@ -282,7 +395,10 @@ class SmsParserService {
         text.contains('pizza') ||
         text.contains('burger') ||
         text.contains('tea') ||
-        text.contains('coffee')) {
+        text.contains('coffee') ||
+        text.contains('biryani') ||
+        text.contains('haldiram') ||
+        text.contains('eatclub')) {
       return 'Food';
     }
 
@@ -295,11 +411,13 @@ class SmsParserService {
         text.contains('shell') ||
         text.contains('hpcl') ||
         text.contains('bpcl') ||
-        text.contains('ioc') ||
+        text.contains('iocl') ||
         text.contains('flight') ||
         text.contains('indigo') ||
         text.contains('makemytrip') ||
-        text.contains('metro')) {
+        text.contains('goibibo') ||
+        text.contains('metro') ||
+        text.contains('railway')) {
       return 'Travel';
     }
 
@@ -315,6 +433,9 @@ class SmsParserService {
         text.contains('dmart') ||
         text.contains('blinkit') ||
         text.contains('zepto') ||
+        text.contains('instamart') ||
+        text.contains('bigbasket') ||
+        text.contains('decathlon') ||
         text.contains('mall') ||
         text.contains('store')) {
       return 'Shopping';
@@ -323,14 +444,18 @@ class SmsParserService {
     if (text.contains('airtel') ||
         text.contains('jio') ||
         text.contains('vi ') ||
+        text.contains('vodafone') ||
         text.contains('electricity') ||
         text.contains('bescom') ||
         text.contains('broadband') ||
         text.contains('wifi') ||
         text.contains('dth') ||
+        text.contains('tata play') ||
         text.contains('recharge') ||
         text.contains('billdesk') ||
-        text.contains('gas')) {
+        text.contains('gas') ||
+        text.contains('igl') ||
+        text.contains('water')) {
       return 'Bills';
     }
 
@@ -341,7 +466,8 @@ class SmsParserService {
         text.contains('bookmyshow') ||
         text.contains('cinema') ||
         text.contains('pvr') ||
-        text.contains('inox')) {
+        text.contains('inox') ||
+        text.contains('youtube')) {
       return 'Entertainment';
     }
 
@@ -352,6 +478,7 @@ class SmsParserService {
         text.contains('hospital') ||
         text.contains('clinic') ||
         text.contains('medplus') ||
+        text.contains('pharmeasy') ||
         text.contains('dr.')) {
       return 'Health';
     }
