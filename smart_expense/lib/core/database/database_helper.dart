@@ -194,12 +194,43 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE pending_sms ADD COLUMN isIncome INTEGER NOT NULL DEFAULT 0');
     } catch (_) {}
     try {
+      await db.execute('ALTER TABLE pending_sms ADD COLUMN dateTime TEXT');
+    } catch (_) {}
+    try {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS app_settings (
           key TEXT PRIMARY KEY,
           value TEXT NOT NULL
         )
       ''');
+    } catch (_) {}
+    try {
+      final rows = await db.query('transactions');
+      final batch = db.batch();
+      bool needsCommit = false;
+      for (final row in rows) {
+        final id = row['id'] as int?;
+        final dtStr = row['dateTime'] as String?;
+        final curMonthYear = row['monthYear'] as String?;
+        if (id != null && dtStr != null) {
+          final dt = DateTime.tryParse(dtStr);
+          if (dt != null) {
+            final expected = TransactionModel.formatMonthYear(dt);
+            if (curMonthYear != expected) {
+              batch.update(
+                'transactions',
+                {'monthYear': expected},
+                where: 'id = ?',
+                whereArgs: [id],
+              );
+              needsCommit = true;
+            }
+          }
+        }
+      }
+      if (needsCommit) {
+        await batch.commit(noResult: true);
+      }
     } catch (_) {}
   }
 

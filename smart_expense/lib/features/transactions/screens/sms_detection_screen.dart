@@ -133,7 +133,6 @@ class _SmsDetectionScreenState extends State<SmsDetectionScreen> {
     await TransactionRepository.instance.confirmSmsTransaction(
       tx,
       chosenCategory: tx.suggestedCategory,
-      monthYear: 'September 2024',
     );
     if (!mounted) return;
     setState(() {

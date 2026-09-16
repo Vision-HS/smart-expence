@@ -11,6 +11,7 @@ class PendingSmsModel {
   final String bankSource;
   bool isSecondCard;
   final bool isIncome;
+  final String? dateTime;
 
   PendingSmsModel({
     required this.id,
@@ -23,6 +24,7 @@ class PendingSmsModel {
     required this.bankSource,
     this.isSecondCard = false,
     this.isIncome = false,
+    this.dateTime,
   });
 
   Map<String, dynamic> toMap() {
@@ -37,6 +39,7 @@ class PendingSmsModel {
       'bankSource': bankSource,
       'isSecondCard': isSecondCard ? 1 : 0,
       'isIncome': isIncome ? 1 : 0,
+      if (dateTime != null) 'dateTime': dateTime,
     };
   }
 
@@ -52,6 +55,7 @@ class PendingSmsModel {
       bankSource: map['bankSource'] as String? ?? 'SMS',
       isSecondCard: (map['isSecondCard'] as int? ?? 0) == 1,
       isIncome: (map['isIncome'] as int? ?? 0) == 1,
+      dateTime: map['dateTime'] as String?,
     );
   }
 
@@ -66,6 +70,7 @@ class PendingSmsModel {
     String? bankSource,
     bool? isSecondCard,
     bool? isIncome,
+    String? dateTime,
   }) {
     return PendingSmsModel(
       id: id ?? this.id,
@@ -78,6 +83,7 @@ class PendingSmsModel {
       bankSource: bankSource ?? this.bankSource,
       isSecondCard: isSecondCard ?? this.isSecondCard,
       isIncome: isIncome ?? this.isIncome,
+      dateTime: dateTime ?? this.dateTime,
     );
   }
 

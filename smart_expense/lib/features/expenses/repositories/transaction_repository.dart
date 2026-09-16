@@ -32,9 +32,14 @@ class TransactionRepository {
 
   Future<int> insertTransaction(TransactionModel txn) async {
     final db = await _dbHelper.database;
+    final dt = DateTime.tryParse(txn.dateTime) ?? DateTime.now();
+    final safeMonthYear = (txn.monthYear.isNotEmpty && txn.monthYear != 'September 2024')
+        ? txn.monthYear
+        : TransactionModel.formatMonthYear(dt);
+    final safeTxn = txn.copyWith(monthYear: safeMonthYear);
     return await db.insert(
       'transactions',
-      txn.toMap(),
+      safeTxn.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
@@ -117,13 +122,17 @@ class TransactionRepository {
         ? chosenCategory
         : sms.suggestedCategory;
 
-    final targetMonth = monthYear ?? TransactionModel.formatMonthYear(DateTime.now());
+    final dtStr = sms.dateTime ?? DateTime.now().toIso8601String();
+    final parsedDt = DateTime.tryParse(dtStr) ?? DateTime.now();
+    final targetMonth = (monthYear != null && monthYear.isNotEmpty && monthYear != 'September 2024')
+        ? monthYear
+        : TransactionModel.formatMonthYear(parsedDt);
 
     final txn = TransactionModel(
       title: finalMerchant,
       amount: sms.isIncome ? finalAmount.abs() : -finalAmount.abs(),
       category: finalCategory,
-      dateTime: DateTime.now().toIso8601String(),
+      dateTime: dtStr,
       account: sms.bankSource,
       paymentType: sms.paymentMode,
       isIncome: sms.isIncome,
@@ -144,8 +153,45 @@ class TransactionRepository {
     );
   }
 
+  /// Automatically synchronizes and fixes any transaction where monthYear does not match dateTime
+  Future<int> syncAndFixTransactionMonths() async {
+    try {
+      final db = await _dbHelper.database;
+      final rows = await db.query('transactions');
+      final batch = db.batch();
+      int fixedCount = 0;
+      for (final row in rows) {
+        final id = row['id'] as int?;
+        final dtStr = row['dateTime'] as String?;
+        final curMonthYear = row['monthYear'] as String?;
+        if (id != null && dtStr != null) {
+          final dt = DateTime.tryParse(dtStr);
+          if (dt != null) {
+            final expectedMonthYear = TransactionModel.formatMonthYear(dt);
+            if (curMonthYear != expectedMonthYear) {
+              batch.update(
+                'transactions',
+                {'monthYear': expectedMonthYear},
+                where: 'id = ?',
+                whereArgs: [id],
+              );
+              fixedCount++;
+            }
+          }
+        }
+      }
+      if (fixedCount > 0) {
+        await batch.commit(noResult: true);
+      }
+      return fixedCount;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   /// Get distinct months with available transactions (plus current month)
   Future<List<String>> getDistinctMonths() async {
+    await syncAndFixTransactionMonths();
     final db = await _dbHelper.database;
     final List<Map<String, dynamic>> res = await db.rawQuery(
       'SELECT DISTINCT monthYear FROM transactions ORDER BY id DESC',

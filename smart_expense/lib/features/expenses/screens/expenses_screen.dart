@@ -33,6 +33,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   Future<void> _loadTransactions() async {
     try {
+      await TransactionRepository.instance.syncAndFixTransactionMonths();
       final months = await TransactionRepository.instance.getDistinctMonths();
       String monthToUse = _selectedMonth;
       if (months.isNotEmpty && !months.contains(_selectedMonth)) {
@@ -58,11 +59,21 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
   }
 
+  int get _debitCount => _monthTransactions.where((t) => !t.isIncome).length;
+  int get _creditCount => _monthTransactions.where((t) => t.isIncome).length;
+
+  String _formatCurrency(double val) {
+    return val.toInt().toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+  }
+
   List<TransactionModel> get _filteredTransactions {
     final list = _monthTransactions;
     if (_selectedFilter == 'All') return list;
-    if (_selectedFilter == 'Expense') return list.where((t) => !t.isIncome).toList();
-    if (_selectedFilter == 'Income') return list.where((t) => t.isIncome).toList();
+    if (_selectedFilter == 'Expense' || _selectedFilter == 'Debited') return list.where((t) => !t.isIncome).toList();
+    if (_selectedFilter == 'Income' || _selectedFilter == 'Credited') return list.where((t) => t.isIncome).toList();
     if (_selectedFilter == 'UPI') return list.where((t) => t.paymentType == 'UPI').toList();
     return list;
   }
@@ -367,9 +378,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  // 3. Segmented Filter Tabs: All, Expense, Income, UPI
+  // 3. Segmented Filter Tabs: All, Debited, Credited, UPI
   Widget _buildSegmentedFilter() {
-    final tabs = ['All', 'Expense', 'Income', 'UPI'];
+    final tabs = ['All', 'Debited', 'Credited', 'UPI'];
 
     return Container(
       padding: const EdgeInsets.all(4),
@@ -408,7 +419,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     tab,
                     style: TextStyle(
                       fontFamily: 'Inter',
-                      fontSize: 14,
+                      fontSize: 13.5,
                       fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
                       color: isSel ? AppTheme.primary : const Color(0xFF464554),
                     ),
@@ -441,11 +452,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'TOTAL SPENT',
-                      style: TextStyle(
+                    Text(
+                      'TOTAL SPENT ($_debitCount)',
+                      style: const TextStyle(
                         fontFamily: 'Inter',
-                        fontSize: 12,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.5,
                         color: Color(0xFF464554),
@@ -468,12 +479,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  '\$${_totalSpent.toStringAsFixed(2)}',
+                  '₹${_formatCurrency(_totalSpent)}',
                   style: const TextStyle(
                     fontFamily: 'Inter',
-                    fontSize: 26,
+                    fontSize: 24,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+                    color: Color(0xFFBA1A1A),
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -497,11 +508,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'TOTAL RECEIVED',
-                      style: TextStyle(
+                    Text(
+                      'TOTAL RECEIVED ($_creditCount)',
+                      style: const TextStyle(
                         fontFamily: 'Inter',
-                        fontSize: 12,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.5,
                         color: Color(0xFF464554),
@@ -524,12 +535,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  '\$${_totalReceived.toStringAsFixed(2)}',
+                  '₹${_formatCurrency(_totalReceived)}',
                   style: const TextStyle(
                     fontFamily: 'Inter',
-                    fontSize: 26,
+                    fontSize: 24,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+                    color: Color(0xFF006C49),
                     letterSpacing: -0.5,
                   ),
                 ),

@@ -47,16 +47,24 @@ class TransactionModel {
   }
 
   factory TransactionModel.fromMap(Map<String, dynamic> map) {
+    final dtStr = map['dateTime'] as String? ?? DateTime.now().toIso8601String();
+    final dt = DateTime.tryParse(dtStr) ?? DateTime.now();
+    final defaultMonth = formatMonthYear(dt);
+    final rawMonth = map['monthYear'] as String?;
+    final resolvedMonth = (rawMonth != null && rawMonth.isNotEmpty && rawMonth != 'September 2024')
+        ? rawMonth
+        : defaultMonth;
+
     return TransactionModel(
       id: map['id'] as int?,
       title: map['title'] as String? ?? 'Transaction',
       amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
       category: map['category'] as String? ?? 'General',
-      dateTime: map['dateTime'] as String? ?? DateTime.now().toIso8601String(),
+      dateTime: dtStr,
       account: map['account'] as String? ?? 'Account',
       paymentType: map['paymentType'] as String? ?? 'UPI',
       isIncome: (map['isIncome'] as int? ?? 0) == 1,
-      monthYear: map['monthYear'] as String? ?? 'September 2024',
+      monthYear: resolvedMonth,
       isSynced: (map['isSynced'] as int? ?? 1) == 1,
       rawSms: map['rawSms'] as String?,
       notes: map['notes'] as String?,

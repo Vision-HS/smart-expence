@@ -60,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadHomeData() async {
     try {
+      await TransactionRepository.instance.syncAndFixTransactionMonths();
       final months = await TransactionRepository.instance.getDistinctMonths();
       final monthToUse = months.isNotEmpty ? months.first : _currentMonth;
       final summary = await TransactionRepository.instance.getMonthSpendSummary(monthToUse);
@@ -520,7 +521,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           await TransactionRepository.instance.confirmSmsTransaction(
                             p,
                             chosenCategory: p.suggestedCategory,
-                            monthYear: 'September 2024',
                           );
                           _loadHomeData();
                           if (context.mounted) {
@@ -576,6 +576,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // September Overview Card with Total Available Balance & Income/Expense sub-boxes
   Widget _buildOverviewCard(BuildContext context) {
+    final double netBalance = _totalReceived - _totalSpent;
+    final String balanceStr = netBalance < 0
+        ? '-₹${_formatCurrency(netBalance.abs().toInt())}'
+        : '₹${_formatCurrency(netBalance.toInt())}';
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -618,7 +623,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            '₹${_formatCurrency((_totalReceived - _totalSpent).toInt())}',
+            balanceStr,
             style: const TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.w700,

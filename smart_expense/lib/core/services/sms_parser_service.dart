@@ -307,6 +307,7 @@ class SmsParserService {
       bankSource: bankSource,
       isSecondCard: paymentMode == 'Card',
       isIncome: isIncome,
+      dateTime: dateTime.toIso8601String(),
     );
   }
 
