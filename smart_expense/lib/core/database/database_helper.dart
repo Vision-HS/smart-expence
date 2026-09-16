@@ -74,6 +74,14 @@ class DatabaseHelper {
       )
     ''');
 
+    // 4. App Settings Table (For 4-Digit Security PIN & Preferences)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+
     // Seed initial statement transactions
     await _seedInitialData(db);
   }
@@ -184,6 +192,60 @@ class DatabaseHelper {
     } catch (_) {}
     try {
       await db.execute('ALTER TABLE pending_sms ADD COLUMN isIncome INTEGER NOT NULL DEFAULT 0');
+    } catch (_) {}
+    try {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS app_settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        )
+      ''');
+    } catch (_) {}
+  }
+
+  // Settings & Security PIN Helpers
+  Future<void> setSetting(String key, String value) async {
+    final db = await database;
+    await db.insert(
+      'app_settings',
+      {'key': key, 'value': value},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<String?> getSetting(String key) async {
+    try {
+      final db = await database;
+      final result = await db.query(
+        'app_settings',
+        where: 'key = ?',
+        whereArgs: [key],
+        limit: 1,
+      );
+      if (result.isNotEmpty) {
+        return result.first['value'] as String?;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<String?> getAppPin() async {
+    return await getSetting('security_pin');
+  }
+
+  Future<void> setAppPin(String pin) async {
+    await setSetting('security_pin', pin);
+  }
+
+  Future<bool> hasConfiguredPin() async {
+    final pin = await getAppPin();
+    return pin != null && pin.trim().length == 4;
+  }
+
+  Future<void> clearAppPin() async {
+    try {
+      final db = await database;
+      await db.delete('app_settings', where: 'key = ?', whereArgs: ['security_pin']);
     } catch (_) {}
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../home/screens/main_wrapper_screen.dart';
 
@@ -11,41 +12,141 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  int _selectedTab = 0; // 0 = Phone & OTP, 1 = Security PIN
-  final TextEditingController _phoneController = TextEditingController(text: '98765 24012');
-  bool _stayUnlocked = true;
+  bool _isLoading = true;
+  bool _isSetupMode = false;
+  int _setupStep = 0; // 0 = enter new PIN, 1 = confirm new PIN
+  String _firstEnteredPin = '';
+  String _currentPin = '';
+  String? _savedPin;
+  String? _errorMessage;
 
   @override
-  void dispose() {
-    _phoneController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _checkExistingPin();
   }
 
-  void _handleUnlock() {
-    HapticFeedback.mediumImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.lock_open_rounded, color: Colors.white, size: 18),
-            SizedBox(width: 8),
-            Text(
-              'Session authenticated successfully',
-              style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w500),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF006C49),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(milliseconds: 1400),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+  Future<void> _checkExistingPin() async {
+    try {
+      final pin = await DatabaseHelper.instance.getAppPin();
+      if (!mounted) return;
+      setState(() {
+        _savedPin = pin;
+        _isSetupMode = (pin == null || pin.trim().length != 4);
+        _setupStep = 0;
+        _firstEnteredPin = '';
+        _currentPin = '';
+        _errorMessage = null;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isSetupMode = true;
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const MainWrapperScreen()),
-    );
+  void _onDigitPressed(String digit) {
+    if (_currentPin.length >= 4) return;
+
+    HapticFeedback.lightImpact();
+    setState(() {
+      _currentPin += digit;
+      _errorMessage = null;
+    });
+
+    if (_currentPin.length == 4) {
+      _processCompletePin(_currentPin);
+    }
+  }
+
+  void _onBackspacePressed() {
+    if (_currentPin.isEmpty) return;
+    HapticFeedback.lightImpact();
+    setState(() {
+      _currentPin = _currentPin.substring(0, _currentPin.length - 1);
+      _errorMessage = null;
+    });
+  }
+
+  Future<void> _processCompletePin(String pin) async {
+    if (_isSetupMode) {
+      if (_setupStep == 0) {
+        // Step 1 done -> Move to confirm step
+        HapticFeedback.mediumImpact();
+        await Future.delayed(const Duration(milliseconds: 200));
+        if (!mounted) return;
+        setState(() {
+          _firstEnteredPin = pin;
+          _currentPin = '';
+          _setupStep = 1;
+          _errorMessage = null;
+        });
+      } else {
+        // Step 2: Confirm PIN
+        if (pin == _firstEnteredPin) {
+          HapticFeedback.mediumImpact();
+          await DatabaseHelper.instance.setAppPin(pin);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    '✓ 4-Digit Security PIN successfully created!',
+                    style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFF006C49),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MainWrapperScreen()),
+          );
+        } else {
+          HapticFeedback.heavyImpact();
+          setState(() {
+            _errorMessage = 'PINs do not match. Please start over.';
+          });
+          await Future.delayed(const Duration(milliseconds: 600));
+          if (!mounted) return;
+          setState(() {
+            _currentPin = '';
+            _firstEnteredPin = '';
+            _setupStep = 0;
+          });
+        }
+      }
+    } else {
+      // Unlock Mode
+      if (pin == _savedPin) {
+        HapticFeedback.mediumImpact();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainWrapperScreen()),
+        );
+      } else {
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _errorMessage = 'Incorrect PIN. Please try again.';
+        });
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (!mounted) return;
+        setState(() {
+          _currentPin = '';
+        });
+      }
+    }
   }
 
   void _handleBiometricUnlock() {
@@ -57,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen> {
             Icon(Icons.fingerprint_rounded, color: Colors.white, size: 20),
             SizedBox(width: 8),
             Text(
-              'Biometric match verified (Hiren - S23 FE)',
+              'Biometric match verified',
               style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w500),
             ),
           ],
@@ -75,33 +176,98 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _showForgotPinDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.lock_reset_rounded, color: Color(0xFFBA1A1A), size: 24),
+            SizedBox(width: 10),
+            Text(
+              'Reset Security PIN?',
+              style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700, fontSize: 18),
+            ),
+          ],
+        ),
+        content: const Text(
+          'You can reset your 4-digit PIN. Your saved transactions, offline records, and ledger data will remain 100% safe.',
+          style: TextStyle(fontFamily: 'Inter', fontSize: 13.5, height: 1.4, color: Color(0xFF464554)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(fontFamily: 'Inter', color: Color(0xFF767586))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFBA1A1A),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              await DatabaseHelper.instance.clearAppPin();
+              if (!ctx.mounted) return;
+              Navigator.pop(ctx);
+              setState(() {
+                _savedPin = null;
+                _isSetupMode = true;
+                _setupStep = 0;
+                _firstEnteredPin = '';
+                _currentPin = '';
+                _errorMessage = null;
+              });
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('PIN reset. Please create your new 4-digit PIN.'),
+                  backgroundColor: Color(0xFF4648D4),
+                ),
+              );
+            },
+            child: const Text(
+              'Reset PIN',
+              style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: AppTheme.canvas,
+        body: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.canvas,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 16),
               _buildBrandHeader(),
-              const SizedBox(height: 36),
-              _buildHeroHeadline(),
-              const SizedBox(height: 24),
-              _buildSegmentedSwitcher(),
-              const SizedBox(height: 24),
-              _buildMobileNumberInput(),
-              const SizedBox(height: 24),
-              _buildQuickAppPinSection(),
-              const SizedBox(height: 18),
-              _buildOptionsRow(),
-              const SizedBox(height: 28),
-              _buildPrimaryUnlockButton(),
-              const SizedBox(height: 16),
-              _buildBiometricButton(),
               const SizedBox(height: 32),
+              _buildSecurityIcon(),
+              const SizedBox(height: 16),
+              _buildTitleAndSubtitle(),
+              const SizedBox(height: 28),
+              _buildPinDotsIndicator(),
+              const SizedBox(height: 12),
+              _buildErrorMessage(),
+              const SizedBox(height: 24),
+              _buildKeypad(),
+              const SizedBox(height: 20),
+              _buildBottomActions(),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -117,8 +283,8 @@ class _LoginScreenState extends State<LoginScreen> {
         Row(
           children: [
             Container(
-              width: 38,
-              height: 38,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: const Color(0xFFF2F3FF),
                 borderRadius: BorderRadius.circular(10),
@@ -126,10 +292,10 @@ class _LoginScreenState extends State<LoginScreen> {
               child: const Icon(
                 Icons.description_outlined,
                 color: Color(0xFF4648D4),
-                size: 20,
+                size: 18,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
@@ -137,18 +303,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   'Smart Expense',
                   style: TextStyle(
                     fontFamily: 'Inter',
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppTheme.textPrimary,
                     letterSpacing: -0.2,
                   ),
                 ),
-                SizedBox(height: 2),
+                SizedBox(height: 1),
                 Text(
                   'LOCAL LEDGER \u2022 OFFLINE FIRST',
                   style: TextStyle(
                     fontFamily: 'Inter',
-                    fontSize: 10.5,
+                    fontSize: 9.5,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
                     color: Color(0xFF767586),
@@ -158,7 +324,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
         ),
-        // Secure Pill Badge
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
@@ -193,28 +358,65 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // 2. Hero Headline
-  Widget _buildHeroHeadline() {
+  // 2. Security Shield / Lock Icon
+  Widget _buildSecurityIcon() {
+    final isError = _errorMessage != null;
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(
+        color: isError ? const Color(0xFFFFDAD6) : const Color(0xFFEAEDFF),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        _isSetupMode
+            ? Icons.lock_outline_rounded
+            : Icons.fingerprint_rounded,
+        size: 34,
+        color: isError ? const Color(0xFFBA1A1A) : const Color(0xFF4648D4),
+      ),
+    );
+  }
+
+  // 3. Title & Subtitle based on Setup vs Unlock
+  Widget _buildTitleAndSubtitle() {
+    String title;
+    String subtitle;
+
+    if (_isSetupMode) {
+      if (_setupStep == 0) {
+        title = 'Create 4-Digit PIN';
+        subtitle = 'Set a 4-digit security PIN to protect your expense ledger.';
+      } else {
+        title = 'Confirm Your PIN';
+        subtitle = 'Enter the same 4-digit PIN again to confirm.';
+      }
+    } else {
+      title = 'Enter Security PIN';
+      subtitle = 'Enter your 4-digit PIN to access your account.';
+    }
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
+      children: [
         Text(
-          'Welcome back',
-          style: TextStyle(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
             fontFamily: 'Inter',
-            fontSize: 28,
+            fontSize: 22,
             fontWeight: FontWeight.w700,
             color: AppTheme.textPrimary,
-            letterSpacing: -0.6,
+            letterSpacing: -0.4,
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Text(
-          'Log in with your registered mobile number to access your auto-synced SMS transaction ledger.',
-          style: TextStyle(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
             fontFamily: 'Inter',
-            fontSize: 14,
-            height: 1.45,
+            fontSize: 13.5,
+            height: 1.4,
             color: Color(0xFF64748B),
           ),
         ),
@@ -222,380 +424,205 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // 3. Segmented Tab Switcher (Phone & OTP vs Security PIN)
-  Widget _buildSegmentedSwitcher() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEAEDFF),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedTab = 0),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                decoration: BoxDecoration(
-                  color: _selectedTab == 0 ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                  boxShadow: _selectedTab == 0
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Center(
-                  child: Text(
-                    'Phone & OTP',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13.5,
-                      fontWeight: _selectedTab == 0 ? FontWeight.w700 : FontWeight.w500,
-                      color: _selectedTab == 0 ? AppTheme.textPrimary : const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedTab = 1),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                decoration: BoxDecoration(
-                  color: _selectedTab == 1 ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                  boxShadow: _selectedTab == 1
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Center(
-                  child: Text(
-                    'Security PIN',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13.5,
-                      fontWeight: _selectedTab == 1 ? FontWeight.w700 : FontWeight.w500,
-                      color: _selectedTab == 1 ? AppTheme.textPrimary : const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 4. Mobile Number Input Field
-  Widget _buildMobileNumberInput() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'MOBILE NUMBER',
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-            color: Color(0xFF767586),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 52,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Row(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14.0),
-                child: Row(
-                  children: const [
-                    Text(
-                      'IN +91',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 24,
-                color: const Color(0xFFE2E8F0),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                    letterSpacing: 0.2,
-                  ),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                    hintText: '98765 24012',
-                    hintStyle: TextStyle(
-                      fontFamily: 'Inter',
-                      color: Color(0xFF94A3B8),
-                    ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 14.0),
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF10B981),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Used to match incoming bank SMS notifications on this device.',
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 11.5,
-            color: Color(0xFF767586),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 5. Quick App PIN (4 Input Boxes with dots)
-  Widget _buildQuickAppPinSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'QUICK APP PIN',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-                color: Color(0xFF767586),
-              ),
-            ),
-            GestureDetector(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Reset link sent to registered phone via SMS.'),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: const Color(0xFF4648D4),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
-              },
-              child: const Text(
-                'Forgot PIN?',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF4648D4),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(4, (index) {
-            return Container(
-              width: (MediaQuery.of(context).size.width - 40 - 36) / 4,
-              height: 52,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Center(
-                child: Container(
-                  width: 7,
-                  height: 7,
-                  decoration: const BoxDecoration(
-                    color: AppTheme.textPrimary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-
-  // 6. Options Row: Stay unlocked checkbox & Biometric Ready
-  Widget _buildOptionsRow() {
+  // 4. 4 Animated PIN Dots
+  Widget _buildPinDotsIndicator() {
+    final isError = _errorMessage != null;
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(4, (index) {
+        final isFilled = index < _currentPin.length;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          margin: const EdgeInsets.symmetric(horizontal: 10),
+          width: 20,
+          height: 20,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isError
+                ? const Color(0xFFBA1A1A)
+                : (isFilled ? const Color(0xFF4648D4) : Colors.white),
+            border: Border.all(
+              color: isError
+                  ? const Color(0xFFBA1A1A)
+                  : (isFilled ? const Color(0xFF4648D4) : const Color(0xFFC4C5D9)),
+              width: 2,
+            ),
+            boxShadow: isFilled && !isError
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF4648D4).withValues(alpha: 0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+        );
+      }),
+    );
+  }
+
+  // 5. Error Message Display
+  Widget _buildErrorMessage() {
+    if (_errorMessage == null) {
+      return const SizedBox(height: 20);
+    }
+    return Text(
+      _errorMessage!,
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFFBA1A1A),
+      ),
+    );
+  }
+
+  // 6. Responsive Numeric Keypad
+  Widget _buildKeypad() {
+    return Column(
       children: [
-        GestureDetector(
-          onTap: () => setState(() => _stayUnlocked = !_stayUnlocked),
-          behavior: HitTestBehavior.opaque,
-          child: Row(
-            children: [
-              Container(
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: _stayUnlocked ? const Color(0xFF4648D4) : Colors.white,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(
-                    color: _stayUnlocked ? const Color(0xFF4648D4) : const Color(0xFFE2E8F0),
-                    width: 1.5,
-                  ),
-                ),
-                child: _stayUnlocked
-                    ? const Icon(
-                        Icons.check,
-                        size: 13,
-                        color: Colors.white,
-                      )
-                    : null,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Stay unlocked on this device',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Text(
-          'Biometric Ready',
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF767586),
-          ),
+        _buildKeypadRow(['1', '2', '3']),
+        const SizedBox(height: 16),
+        _buildKeypadRow(['4', '5', '6']),
+        const SizedBox(height: 16),
+        _buildKeypadRow(['7', '8', '9']),
+        const SizedBox(height: 16),
+        _buildKeypadBottomRow(),
+      ],
+    );
+  }
+
+  Widget _buildKeypadRow(List<String> digits) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: digits.map((digit) => _buildKeypadButton(digit)).toList(),
+    );
+  }
+
+  Widget _buildKeypadBottomRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        // Left Button: Biometric in Unlock Mode, or Back in Step 1
+        if (!_isSetupMode)
+          _buildActionKey(
+            icon: Icons.fingerprint_rounded,
+            onTap: _handleBiometricUnlock,
+            color: const Color(0xFF4648D4),
+          )
+        else if (_setupStep == 1)
+          _buildActionKey(
+            icon: Icons.arrow_back_rounded,
+            onTap: () {
+              setState(() {
+                _setupStep = 0;
+                _firstEnteredPin = '';
+                _currentPin = '';
+                _errorMessage = null;
+              });
+            },
+            color: const Color(0xFF767586),
+          )
+        else
+          const SizedBox(width: 72, height: 72),
+
+        // Center Button: 0
+        _buildKeypadButton('0'),
+
+        // Right Button: Backspace
+        _buildActionKey(
+          icon: Icons.backspace_outlined,
+          onTap: _onBackspacePressed,
+          color: AppTheme.textPrimary,
         ),
       ],
     );
   }
 
-  // 7. Primary CTA Button: Unlock Smart Expense →
-  Widget _buildPrimaryUnlockButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF5B5CE6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          elevation: 0,
-        ),
-        onPressed: _handleUnlock,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Text(
-              'Unlock Smart Expense',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            SizedBox(width: 8),
-            Icon(
-              Icons.arrow_forward_rounded,
-              color: Colors.white,
-              size: 18,
+  Widget _buildKeypadButton(String digit) {
+    return InkWell(
+      onTap: () => _onDigitPressed(digit),
+      borderRadius: BorderRadius.circular(36),
+      child: Container(
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          digit,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
+          ),
         ),
       ),
     );
   }
 
-  // 8. Secondary Biometric Button: Use Fingerprint / Face Unlock
-  Widget _buildBiometricButton() {
-    return Center(
-      child: InkWell(
-        onTap: _handleBiometricUnlock,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(
-                Icons.fingerprint_rounded,
-                color: Color(0xFF4648D4),
-                size: 18,
-              ),
-              SizedBox(width: 8),
-              Text(
-                'Use Fingerprint / Face Unlock',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-            ],
+  Widget _buildActionKey({
+    required IconData icon,
+    required VoidCallback onTap,
+    required Color color,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(36),
+      child: Container(
+        width: 72,
+        height: 72,
+        alignment: Alignment.center,
+        child: Icon(icon, color: color, size: 26),
+      ),
+    );
+  }
+
+  // 7. Bottom Actions: Forgot PIN? / Remember PIN note
+  Widget _buildBottomActions() {
+    if (_isSetupMode) {
+      return Text(
+        _setupStep == 0
+            ? 'Step 1 of 2: Enter 4 digits'
+            : 'Step 2 of 2: Re-enter 4 digits to confirm',
+        style: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF4648D4),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        TextButton(
+          onPressed: _showForgotPinDialog,
+          child: const Text(
+            'Forgot PIN?',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF4648D4),
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
