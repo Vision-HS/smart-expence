@@ -63,6 +63,15 @@ class TransactionModel {
     );
   }
 
+  static const List<String> monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  static String formatMonthYear(DateTime dt) {
+    return '${monthNames[dt.month - 1]} ${dt.year}';
+  }
+
   TransactionModel copyWith({
     int? id,
     String? title,
@@ -93,8 +102,7 @@ class TransactionModel {
     );
   }
 
-  // UI Presentation Helpers
-  IconData get icon {
+  static IconData getIconForCategory(String category) {
     switch (category.toLowerCase()) {
       case 'food':
       case 'food & dining':
@@ -119,6 +127,9 @@ class TransactionModel {
         return Icons.receipt_long_outlined;
     }
   }
+
+  // UI Presentation Helpers
+  IconData get icon => getIconForCategory(category);
 
   Color get iconBgColor {
     if (isIncome) return const Color(0xFFDCFCE7);

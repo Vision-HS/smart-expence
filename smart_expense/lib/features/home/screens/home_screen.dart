@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/database/database_helper.dart';
 import '../../../core/services/sms_parser_service.dart';
 import '../../expenses/models/pending_sms_model.dart';
 import '../../expenses/models/transaction_model.dart';
@@ -9,6 +10,7 @@ import '../../expenses/screens/add_expense_screen.dart';
 import '../../transactions/screens/sms_detection_screen.dart';
 import '../../expenses/screens/expenses_screen.dart';
 import '../../transactions/screens/transaction_details_screen.dart';
+import '../../settings/screens/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onViewAllPressed;
@@ -26,6 +28,14 @@ class _HomeScreenState extends State<HomeScreen> {
   PendingSmsModel? _latestPending;
   List<TransactionModel> _recentTxns = [];
   StreamSubscription<PendingSmsModel>? _smsSubscription;
+
+  double _todaySpent = 0.0;
+  int _todayOrders = 0;
+  double _weekSpent = 0.0;
+  double _monthSpent = 0.0;
+  List<Map<String, dynamic>> _homeCategorySummary = [];
+  String _currentMonth = TransactionModel.formatMonthYear(DateTime.now());
+  String _displayName = 'Hiren';
 
   @override
   void initState() {
@@ -50,20 +60,41 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadHomeData() async {
     try {
-      final summary = await TransactionRepository.instance.getMonthSpendSummary('September 2024');
+      final months = await TransactionRepository.instance.getDistinctMonths();
+      final monthToUse = months.isNotEmpty ? months.first : _currentMonth;
+      final summary = await TransactionRepository.instance.getMonthSpendSummary(monthToUse);
       final pending = await TransactionRepository.instance.getPendingSms();
       final allTx = await TransactionRepository.instance.getAllTransactions();
+      final quickMetrics = await TransactionRepository.instance.getQuickSpendingMetrics();
+      final catSummary = await TransactionRepository.instance.getCategorySpendSummary(monthToUse);
+      final savedName = await DatabaseHelper.instance.getSetting('display_name');
 
       if (mounted) {
         setState(() {
+          _currentMonth = monthToUse;
           _totalSpent = summary['spent'] ?? 0.0;
           _totalReceived = summary['received'] ?? 0.0;
           _pendingCount = pending.length;
           _latestPending = pending.isNotEmpty ? pending.first : null;
           _recentTxns = allTx.take(3).toList();
+          _todaySpent = (quickMetrics['todaySpent'] as num?)?.toDouble() ?? 0.0;
+          _todayOrders = (quickMetrics['todayOrders'] as num?)?.toInt() ?? 0;
+          _weekSpent = (quickMetrics['weekSpent'] as num?)?.toDouble() ?? 0.0;
+          _monthSpent = (quickMetrics['monthSpent'] as num?)?.toDouble() ?? 0.0;
+          _homeCategorySummary = catSummary;
+          if (savedName != null && savedName.trim().isNotEmpty) {
+            _displayName = savedName.trim();
+          }
         });
       }
     } catch (_) {}
+  }
+
+  Future<void> _handleRefresh() async {
+    try {
+      await SmsParserService.instance.syncInboxMessages(limit: 150);
+    } catch (_) {}
+    await _loadHomeData();
   }
 
   String _formatCurrency(int val) {
@@ -80,15 +111,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (result != null && result is Map<String, dynamic>) {
       final amt = (result['amount'] as num).toDouble();
+      final date = result['date'] as DateTime? ?? DateTime.now();
       final txn = TransactionModel(
         title: result['merchant'] ?? 'Custom Expense',
         amount: -amt.abs(),
         category: result['category'] ?? 'General',
-        dateTime: DateTime.now().toIso8601String(),
+        dateTime: date.toIso8601String(),
         account: result['payment'] ?? 'Default Account',
         paymentType: result['payment'] ?? 'UPI',
         isIncome: false,
-        monthYear: 'September 2024',
+        monthYear: TransactionModel.formatMonthYear(date),
         notes: result['notes'],
       );
       await TransactionRepository.instance.insertTransaction(txn);
@@ -109,39 +141,44 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppTheme.canvas,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Header / Profile Bar
-              _buildHeader(context),
-              const SizedBox(height: 16),
+        child: RefreshIndicator(
+          onRefresh: _handleRefresh,
+          color: AppTheme.primary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Header / Profile Bar
+                _buildHeader(context),
+                const SizedBox(height: 16),
 
-              // 2. SMS Detection Banner
-              _buildSmsDetectionBanner(context),
-              const SizedBox(height: 16),
+                // 2. SMS Detection Banner
+                _buildSmsDetectionBanner(context),
+                const SizedBox(height: 16),
 
-              // 3. September Overview Card
-              _buildOverviewCard(context),
-              const SizedBox(height: 12),
+                // 3. Month Overview Card
+                _buildOverviewCard(context),
+                const SizedBox(height: 12),
 
-              // 4. Quick Metric Cards (Today, This Week, This Month)
-              _buildQuickMetricsRow(context),
-              const SizedBox(height: 16),
+                // 4. Quick Metric Cards (Today, This Week, This Month)
+                _buildQuickMetricsRow(context),
+                const SizedBox(height: 16),
 
-              // 5. Spending by Category Card
-              _buildSpendingByCategoryCard(context),
-              const SizedBox(height: 20),
+                // 5. Spending by Category Card
+                _buildSpendingByCategoryCard(context),
+                const SizedBox(height: 20),
 
-              // 6. Recent Transactions Section
-              _buildRecentTransactionsSection(context),
-              const SizedBox(height: 20),
+                // 6. Recent Transactions Section
+                _buildRecentTransactionsSection(context),
+                const SizedBox(height: 20),
 
-              // 7. Add Expense Manually Button
-              _buildAddExpenseButton(context),
-              const SizedBox(height: 24),
-            ],
+                // 7. Add Expense Manually Button
+                _buildAddExpenseButton(context),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
@@ -150,15 +187,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Header: Greeting + Notification Bell + HS Avatar
   Widget _buildHeader(BuildContext context) {
+    String initials = 'HS';
+    if (_displayName.trim().isNotEmpty) {
+      final parts = _displayName.trim().split(' ');
+      if (parts.length >= 2) {
+        initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      } else if (parts.first.isNotEmpty) {
+        initials = parts.first.substring(0, parts.first.length >= 2 ? 2 : 1).toUpperCase();
+      }
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
-              'Good morning, Hiren',
-              style: TextStyle(
+              'Good morning, $_displayName',
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: AppTheme.textPrimary,
@@ -166,10 +213,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontFamily: 'Inter',
               ),
             ),
-            SizedBox(height: 2),
+            const SizedBox(height: 2),
             Text(
-              'September 2026',
-              style: TextStyle(
+              _currentMonth,
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: AppTheme.textSecondary,
@@ -217,21 +264,31 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(width: 10),
             // User Avatar
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceContainerHighest,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'HS',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
-                  fontFamily: 'Inter',
+            InkWell(
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
+                _loadHomeData();
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceContainerHighest,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  initials,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                    fontFamily: 'Inter',
+                  ),
                 ),
               ),
             ),
@@ -531,10 +588,10 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
+            children: [
               Text(
-                'SEPTEMBER OVERVIEW',
-                style: TextStyle(
+                '${_currentMonth.toUpperCase()} OVERVIEW',
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,
@@ -542,7 +599,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   fontFamily: 'Inter',
                 ),
               ),
-              Icon(
+              const Icon(
                 Icons.account_balance_wallet_outlined,
                 size: 19,
                 color: AppTheme.textSecondary,
@@ -695,22 +752,22 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         _buildMetricItem(
           title: 'Today',
-          value: '₹850',
-          subtext: '3 orders',
+          value: '₹${_formatCurrency(_todaySpent.toInt())}',
+          subtext: '$_todayOrders txns',
           subtextColor: AppTheme.textMuted,
         ),
         const SizedBox(width: 8),
         _buildMetricItem(
           title: 'This Week',
-          value: '₹4,250',
-          subtext: '-12% vs last',
+          value: '₹${_formatCurrency(_weekSpent.toInt())}',
+          subtext: 'Past 7 days',
           subtextColor: const Color(0xFF006C49),
         ),
         const SizedBox(width: 8),
         _buildMetricItem(
           title: 'This Month',
-          value: '₹18,450',
-          subtext: '62% of cap',
+          value: '₹${_formatCurrency((_monthSpent > 0 ? _monthSpent : _totalSpent).toInt())}',
+          subtext: _currentMonth,
           subtextColor: AppTheme.textMuted,
         ),
       ],
@@ -780,11 +837,12 @@ class _HomeScreenState extends State<HomeScreen> {
         border: Border.all(color: AppTheme.border, width: 1),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
+            children: [
+              const Text(
                 'Spending by Category',
                 style: TextStyle(
                   fontSize: 16,
@@ -794,8 +852,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Text(
-                'Budget: ₹30,000',
-                style: TextStyle(
+                _totalSpent > 0 ? 'Total: ₹${_formatCurrency(_totalSpent.toInt())}' : 'No Spends',
+                style: const TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w500,
                   color: AppTheme.textSecondary,
@@ -805,34 +863,33 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          _buildCategoryProgressItem(
-            icon: Icons.restaurant_outlined,
-            title: 'Food & Dining',
-            amount: '₹4,500',
-            progress: 0.55,
-          ),
-          const SizedBox(height: 14),
-          _buildCategoryProgressItem(
-            icon: Icons.receipt_long_outlined,
-            title: 'Bills & Utilities',
-            amount: '₹5,000',
-            progress: 0.65,
-          ),
-          const SizedBox(height: 14),
-          _buildCategoryProgressItem(
-            icon: Icons.shopping_bag_outlined,
-            title: 'Shopping',
-            amount: '₹3,200',
-            progress: 0.42,
-          ),
-          const SizedBox(height: 14),
-          _buildCategoryProgressItem(
-            icon: Icons.directions_car_outlined,
-            title: 'Travel',
-            amount: '₹2,100',
-            progress: 0.28,
-            progressColor: const Color(0xFF9FA2F6),
-          ),
+          if (_homeCategorySummary.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8.0),
+              child: Text(
+                'No category expenses recorded for this month.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            )
+          else
+            ..._homeCategorySummary.take(4).map((item) {
+              final catName = item['category'] as String? ?? 'Other';
+              final amt = (item['total'] as num?)?.toDouble() ?? 0.0;
+              final progress = _totalSpent > 0 ? (amt / _totalSpent).clamp(0.0, 1.0) : 0.0;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 14.0),
+                child: _buildCategoryProgressItem(
+                  icon: TransactionModel.getIconForCategory(catName),
+                  title: catName,
+                  amount: '₹${_formatCurrency(amt.toInt())}',
+                  progress: progress,
+                ),
+              );
+            }),
         ],
       ),
     );
@@ -971,11 +1028,13 @@ class _HomeScreenState extends State<HomeScreen> {
             itemBuilder: (context, index) {
               final tx = _recentTxns[index];
               return InkWell(
-                onTap: () {
-                  Navigator.push(
+                onTap: () async {
+                  final res = await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => TransactionDetailsScreen(
+                        transaction: tx,
+                        id: tx.id,
                         title: tx.title,
                         isVerified: true,
                         category: tx.category,
@@ -990,6 +1049,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   );
+                  if (res == true) {
+                    _loadHomeData();
+                  }
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(

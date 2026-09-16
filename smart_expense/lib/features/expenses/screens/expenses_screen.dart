@@ -5,6 +5,7 @@ import '../repositories/transaction_repository.dart';
 import 'add_expense_screen.dart';
 import '../../transactions/screens/sms_detection_screen.dart';
 import '../../transactions/screens/transaction_details_screen.dart';
+import '../../settings/screens/profile_screen.dart';
 
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
@@ -14,14 +15,11 @@ class ExpensesScreen extends StatefulWidget {
 }
 
 class _ExpensesScreenState extends State<ExpensesScreen> {
-  String _selectedMonth = 'September 2024';
+  String _selectedMonth = TransactionModel.formatMonthYear(DateTime.now());
   String _selectedFilter = 'All'; // 'All', 'Expense', 'Income', 'UPI'
 
-  final List<String> _availableMonths = [
-    'September 2024',
-    'October 2024',
-    'August 2024',
-    'July 2024',
+  List<String> _availableMonths = [
+    TransactionModel.formatMonthYear(DateTime.now()),
   ];
 
   List<TransactionModel> _monthTransactions = [];
@@ -35,9 +33,18 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   Future<void> _loadTransactions() async {
     try {
-      final list = await TransactionRepository.instance.getTransactionsByMonth(_selectedMonth);
+      final months = await TransactionRepository.instance.getDistinctMonths();
+      String monthToUse = _selectedMonth;
+      if (months.isNotEmpty && !months.contains(_selectedMonth)) {
+        monthToUse = months.first;
+      }
+      final list = await TransactionRepository.instance.getTransactionsByMonth(monthToUse);
       if (mounted) {
         setState(() {
+          if (months.isNotEmpty) {
+            _availableMonths = months;
+          }
+          _selectedMonth = monthToUse;
           _monthTransactions = list;
           _isLoading = false;
         });
@@ -151,18 +158,20 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
     if (result != null && result is Map<String, dynamic>) {
       final amt = (result['amount'] as num).toDouble();
+      final date = result['date'] as DateTime? ?? DateTime.now();
       final txn = TransactionModel(
         title: result['merchant'] ?? 'Custom Expense',
         amount: -amt.abs(),
         category: result['category'] ?? 'General',
-        dateTime: DateTime.now().toIso8601String(),
+        dateTime: date.toIso8601String(),
         account: result['payment'] ?? 'Default Account',
         paymentType: result['payment'] ?? 'UPI',
         isIncome: false,
-        monthYear: _selectedMonth,
+        monthYear: TransactionModel.formatMonthYear(date),
         notes: result['notes'],
       );
       await TransactionRepository.instance.insertTransaction(txn);
+      _selectedMonth = TransactionModel.formatMonthYear(date);
       _loadTransactions();
     }
   }
@@ -182,6 +191,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.surface,
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: AppTheme.primary,
+        onPressed: _navigateToAddExpense,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -238,20 +252,29 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 color: AppTheme.textPrimary,
                 size: 24,
               ),
-              onPressed: () {},
+              onPressed: _openSmsDetection,
             ),
             const SizedBox(width: 4),
-            Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: AppTheme.primary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 20,
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
+              },
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(
+                  color: AppTheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
           ],
@@ -616,21 +639,27 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           return Column(
             children: [
               InkWell(
-                onTap: () {
-                  Navigator.push(
+                onTap: () async {
+                  final res = await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => TransactionDetailsScreen(
+                        transaction: item,
+                        id: item.id,
                         title: item.title,
-                        category: item.subtitle.split('\u2022').first.trim(),
+                        category: item.category,
                         amount: item.amount,
                         dateTime: item.dateGroup,
                         status: item.isIncome ? 'Completed via Bank Transfer' : 'Completed via ${item.paymentType}',
                         bankAccount: item.account,
                         paymentMethod: item.paymentType,
+                        expenseSource: item.rawSms != null ? 'Verified SMS' : 'Manual Entry',
                       ),
                     ),
                   );
+                  if (res == true) {
+                    _loadTransactions();
+                  }
                 },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

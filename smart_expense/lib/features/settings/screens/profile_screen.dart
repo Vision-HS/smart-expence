@@ -23,7 +23,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _loadProfile();
     _loadDbStats();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final savedName = await DatabaseHelper.instance.getSetting('display_name');
+      final bio = await DatabaseHelper.instance.getSetting('biometric_unlock');
+      if (mounted) {
+        setState(() {
+          if (savedName != null && savedName.trim().isNotEmpty) {
+            _displayName = savedName.trim();
+          }
+          if (bio != null) {
+            _biometricUnlock = bio == 'true';
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadDbStats() async {
@@ -164,11 +182,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: () {
-                        if (ctrl.text.trim().isNotEmpty) {
-                          setState(() => _displayName = ctrl.text.trim());
+                      onPressed: () async {
+                        final newName = ctrl.text.trim();
+                        if (newName.isNotEmpty) {
+                          setState(() => _displayName = newName);
+                          await DatabaseHelper.instance.setSetting('display_name', newName);
                         }
-                        Navigator.pop(ctx);
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                        }
                       },
                       child: const Text('Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                     ),
@@ -863,6 +885,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         value: _biometricUnlock,
                         onChanged: (val) {
                           setState(() => _biometricUnlock = val);
+                          DatabaseHelper.instance.setSetting('biometric_unlock', val ? 'true' : 'false');
                         },
                         activeThumbColor: Colors.white,
                         activeTrackColor: AppTheme.primary,

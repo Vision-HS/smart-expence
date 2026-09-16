@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../categories/screens/categories_screen.dart';
+import '../../expenses/repositories/transaction_repository.dart';
+import '../../transactions/screens/sms_detection_screen.dart';
 import 'automatic_detection_screen.dart';
 import 'profile_screen.dart';
 
@@ -32,7 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
         content: const Text(
-          'This action will permanently purge all transactions, budgets, categories, and account information from this device. This cannot be undone.',
+          'This action will permanently purge all transactions and pending SMS alerts from this device. This cannot be undone.',
           style: TextStyle(fontFamily: 'Inter', fontSize: 13.5, height: 1.4, color: AppTheme.textSecondary),
         ),
         actions: [
@@ -41,14 +44,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: const Text('Cancel', style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Data purge canceled (demo mode safeguard)'),
-                  backgroundColor: AppTheme.primary,
+            onPressed: () async {
+              final nav = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+              await TransactionRepository.instance.clearAllData();
+              nav.pop();
+              messenger.showSnackBar(
+                const SnackBar(
+                  content: Text('✓ All local transaction records permanently purged.'),
+                  backgroundColor: Color(0xFFBA1A1A),
                   behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               );
             },
@@ -60,6 +65,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: const Text('Delete', style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: Colors.white)),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _exportAllData() async {
+    final txs = await TransactionRepository.instance.getAllTransactions();
+    final buffer = StringBuffer();
+    buffer.writeln('ID,Date,Merchant,Amount,Category,Type,Account,PaymentMode,Notes');
+    for (final t in txs) {
+      final amt = t.amount.abs().toStringAsFixed(2);
+      final type = t.isIncome ? 'Credit' : 'Debit';
+      final cleanTitle = t.title.replaceAll(',', ' ');
+      final cleanNotes = (t.notes ?? '').replaceAll(',', ' ');
+      buffer.writeln('${t.id ?? ''},${t.dateTime},$cleanTitle,$amt,${t.category},$type,${t.account},${t.paymentType},$cleanNotes');
+    }
+    await Clipboard.setData(ClipboardData(text: buffer.toString()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '✓ Complete ledger (${txs.length} txns) exported to clipboard (CSV)!',
+                style: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF006C49),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -131,43 +171,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         Row(
           children: [
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                IconButton(
-                  icon: const Icon(
-                    Icons.notifications_none_rounded,
-                    color: AppTheme.textPrimary,
-                    size: 24,
-                  ),
-                  onPressed: () {},
-                ),
-                Positioned(
-                  top: 10,
-                  right: 12,
-                  child: Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                      color: AppTheme.tertiary,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ],
+            IconButton(
+              icon: const Icon(
+                Icons.notifications_none_rounded,
+                color: AppTheme.textPrimary,
+                size: 24,
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SmsDetectionScreen()),
+                );
+              },
             ),
             const SizedBox(width: 4),
-            Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: AppTheme.primary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 20,
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
+              },
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(
+                  color: AppTheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
           ],
@@ -394,7 +431,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             iconBg: const Color(0xFFEEF2FF),
             title: 'Export Data',
             subtitle: 'CSV, Excel, or JSON export',
-            onTap: () => _showToast('Exporting ledger data (CSV/Excel/JSON)...'),
+            onTap: _exportAllData,
           ),
           const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
           _buildSettingsRow(

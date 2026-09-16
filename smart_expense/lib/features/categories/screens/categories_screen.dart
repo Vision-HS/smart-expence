@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../expenses/repositories/transaction_repository.dart';
+import '../../transactions/screens/transaction_details_screen.dart';
+import '../../transactions/screens/sms_detection_screen.dart';
+import '../../settings/screens/profile_screen.dart';
 
 class CategoryItemData {
   final String name;
@@ -105,6 +109,114 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         _searchQuery = _searchController.text.trim().toLowerCase();
       });
     });
+
+    _loadCategoryCounts();
+  }
+
+  Future<void> _loadCategoryCounts() async {
+    final updatedList = <CategoryItemData>[];
+    for (final cat in _categories) {
+      final count = await TransactionRepository.instance.getCategoryTransactionCount(cat.name);
+      updatedList.add(CategoryItemData(
+        name: cat.name,
+        description: cat.description,
+        txns: count,
+        icon: cat.icon,
+      ));
+    }
+    if (mounted) {
+      setState(() {
+        _categories = updatedList;
+      });
+    }
+  }
+
+  void _showCategoryTransactionsSheet(String categoryName) async {
+    final txs = await TransactionRepository.instance.getTransactionsByCategory(categoryName);
+    if (!mounted) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.65,
+        minChildSize: 0.35,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, scrollController) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppTheme.border, borderRadius: BorderRadius.circular(2))),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    categoryName,
+                    style: const TextStyle(fontFamily: 'Inter', fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                  ),
+                  Text('${txs.length} transactions', style: const TextStyle(fontFamily: 'Inter', color: AppTheme.textSecondary, fontSize: 13)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: txs.isEmpty
+                    ? const Center(
+                        child: Text('No recorded transactions in this category.', style: TextStyle(color: AppTheme.textSecondary)),
+                      )
+                    : ListView.separated(
+                        controller: scrollController,
+                        itemCount: txs.length,
+                        separatorBuilder: (_, _) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        itemBuilder: (context, idx) {
+                          final item = txs[idx];
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                            leading: Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(color: item.iconBgColor, borderRadius: BorderRadius.circular(10)),
+                              child: Icon(item.icon, color: item.iconColor, size: 18),
+                            ),
+                            title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                            subtitle: Text('${item.dateGroup} • ${item.paymentType}', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                            trailing: Text(
+                              '${item.isIncome ? '+' : '-'}₹${item.amount.abs().toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14.5,
+                                color: item.isIncome ? const Color(0xFF006C49) : const Color(0xFFBA1A1A),
+                              ),
+                            ),
+                            onTap: () async {
+                              Navigator.pop(ctx);
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TransactionDetailsScreen(
+                                    transaction: item,
+                                    id: item.id,
+                                  ),
+                                ),
+                              );
+                              _loadCategoryCounts();
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -396,14 +508,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     child: OutlinedButton(
                       onPressed: () {
                         Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Transactions for ${category.name} loaded'),
-                            backgroundColor: AppTheme.primary,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                        );
+                        _showCategoryTransactionsSheet(category.name);
                       },
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -505,20 +610,34 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 color: AppTheme.textPrimary,
                 size: 24,
               ),
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SmsDetectionScreen()),
+                );
+              },
             ),
             const SizedBox(width: 4),
-            Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: AppTheme.primary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 20,
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
+              },
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(
+                  color: AppTheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
           ],

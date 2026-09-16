@@ -10,16 +10,14 @@ class AddExpenseScreen extends StatefulWidget {
 
 class _AddExpenseScreenState extends State<AddExpenseScreen> {
   double _amount = 0.0;
-  final TextEditingController _merchantController =
-      TextEditingController(text: 'Rahul');
-  final TextEditingController _notesController =
-      TextEditingController(text: 'Lunch with team at cafe');
+  final TextEditingController _merchantController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
 
   String _selectedCategory = 'Food & Dining';
   IconData _selectedCategoryIcon = Icons.restaurant_outlined;
 
-  DateTime _selectedDate = DateTime(2026, 9, 3);
-  TimeOfDay _selectedTime = const TimeOfDay(hour: 9, minute: 15);
+  DateTime _selectedDate = DateTime.now();
+  TimeOfDay _selectedTime = TimeOfDay.now();
 
   String _selectedPaymentMethod = 'UPI';
   final List<String> _paymentMethods = ['UPI', 'Card', 'Cash', 'NetBank'];
@@ -780,12 +778,22 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       height: 50,
       child: ElevatedButton(
         onPressed: () {
-          final amt = _amount > 0 ? _amount : 500.0;
+          if (_amount <= 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please enter an amount greater than \u20B90'),
+                backgroundColor: Color(0xFFBA1A1A),
+                duration: Duration(seconds: 2),
+              ),
+            );
+            return;
+          }
+          final merchant = _merchantController.text.trim().isNotEmpty
+              ? _merchantController.text.trim()
+              : 'Expense';
           Navigator.pop(context, {
-            'merchant': _merchantController.text.trim().isNotEmpty
-                ? _merchantController.text.trim()
-                : 'Expense',
-            'amount': amt,
+            'merchant': merchant,
+            'amount': _amount,
             'category': _selectedCategory,
             'payment': _selectedPaymentMethod,
             'notes': _notesController.text.trim(),
@@ -795,7 +803,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Saved expense: \u20B9${amt.toStringAsFixed(2)} for ${_merchantController.text}',
+                'Saved expense: \u20B9${_amount.toStringAsFixed(2)} for $merchant',
               ),
               backgroundColor: AppTheme.primary,
               duration: const Duration(seconds: 2),

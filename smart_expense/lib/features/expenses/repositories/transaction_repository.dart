@@ -39,6 +39,17 @@ class TransactionRepository {
     );
   }
 
+  Future<int> updateTransaction(TransactionModel txn) async {
+    if (txn.id == null) return 0;
+    final db = await _dbHelper.database;
+    return await db.update(
+      'transactions',
+      txn.toMap(),
+      where: 'id = ?',
+      whereArgs: [txn.id],
+    );
+  }
+
   Future<int> deleteTransaction(int id) async {
     final db = await _dbHelper.database;
     return await db.delete(
@@ -106,7 +117,7 @@ class TransactionRepository {
         ? chosenCategory
         : sms.suggestedCategory;
 
-    final targetMonth = monthYear ?? 'September 2024';
+    final targetMonth = monthYear ?? TransactionModel.formatMonthYear(DateTime.now());
 
     final txn = TransactionModel(
       title: finalMerchant,
@@ -131,6 +142,116 @@ class TransactionRepository {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  /// Get distinct months with available transactions (plus current month)
+  Future<List<String>> getDistinctMonths() async {
+    final db = await _dbHelper.database;
+    final List<Map<String, dynamic>> res = await db.rawQuery(
+      'SELECT DISTINCT monthYear FROM transactions ORDER BY id DESC',
+    );
+    final list = res.map((r) => r['monthYear'] as String).toList();
+    final currentMonth = TransactionModel.formatMonthYear(DateTime.now());
+    if (!list.contains(currentMonth)) {
+      list.insert(0, currentMonth);
+    }
+    return list.isNotEmpty ? list : [currentMonth];
+  }
+
+  /// Get category breakdown for a specific month
+  Future<List<Map<String, dynamic>>> getCategorySpendSummary(String monthYear) async {
+    final db = await _dbHelper.database;
+    final List<Map<String, dynamic>> res = await db.rawQuery(
+      '''
+      SELECT category, SUM(ABS(amount)) as total, COUNT(*) as count
+      FROM transactions
+      WHERE monthYear = ? AND isIncome = 0
+      GROUP BY category
+      ORDER BY total DESC
+      ''',
+      [monthYear],
+    );
+    return res;
+  }
+
+  /// Get top spending transactions for a month
+  Future<List<TransactionModel>> getTopSpendingTransactions(String monthYear, {int limit = 5}) async {
+    final db = await _dbHelper.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'transactions',
+      where: 'monthYear = ? AND isIncome = 0',
+      whereArgs: [monthYear],
+      orderBy: 'ABS(amount) DESC',
+      limit: limit,
+    );
+    return List.generate(maps.length, (i) => TransactionModel.fromMap(maps[i]));
+  }
+
+  /// Get Today, This Week, and This Month spending metrics
+  Future<Map<String, dynamic>> getQuickSpendingMetrics() async {
+    final all = await getAllTransactions();
+    final now = DateTime.now();
+    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final sevenDaysAgo = now.subtract(const Duration(days: 7));
+    final currentMonth = TransactionModel.formatMonthYear(now);
+
+    double todaySpent = 0.0;
+    int todayOrders = 0;
+    double weekSpent = 0.0;
+    double monthSpent = 0.0;
+
+    for (final tx in all) {
+      if (tx.isIncome) continue;
+      final amt = tx.amount.abs();
+      if (tx.dateTime.startsWith(todayStr)) {
+        todaySpent += amt;
+        todayOrders++;
+      }
+      try {
+        final dt = DateTime.parse(tx.dateTime);
+        if (dt.isAfter(sevenDaysAgo)) {
+          weekSpent += amt;
+        }
+      } catch (_) {}
+      if (tx.monthYear == currentMonth) {
+        monthSpent += amt;
+      }
+    }
+    return {
+      'todaySpent': todaySpent,
+      'todayOrders': todayOrders,
+      'weekSpent': weekSpent,
+      'monthSpent': monthSpent,
+    };
+  }
+
+  /// Count transactions for a given category
+  Future<int> getCategoryTransactionCount(String category) async {
+    final db = await _dbHelper.database;
+    final res = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM transactions WHERE LOWER(category) = LOWER(?)',
+      [category],
+    );
+    return Sqflite.firstIntValue(res) ?? 0;
+  }
+
+  /// Get transactions for a given category
+  Future<List<TransactionModel>> getTransactionsByCategory(String category) async {
+    final db = await _dbHelper.database;
+    final res = await db.query(
+      'transactions',
+      where: 'LOWER(category) = LOWER(?)',
+      whereArgs: [category],
+      orderBy: 'id DESC',
+    );
+    return List.generate(res.length, (i) => TransactionModel.fromMap(res[i]));
+  }
+
+  /// Purge all transactions and pending SMS
+  Future<void> clearAllData() async {
+    final db = await _dbHelper.database;
+    await db.delete('transactions');
+    await db.delete('pending_sms');
   }
 
   // Database Stats for Profile / Ledger Audit
