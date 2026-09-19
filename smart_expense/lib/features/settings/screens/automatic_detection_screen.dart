@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/sms_parser_service.dart';
+import '../../../core/services/notification_parser_service.dart';
 
 class AutomaticDetectionScreen extends StatefulWidget {
   final VoidCallback? onBack;
@@ -11,8 +12,10 @@ class AutomaticDetectionScreen extends StatefulWidget {
   State<AutomaticDetectionScreen> createState() => _AutomaticDetectionScreenState();
 }
 
-class _AutomaticDetectionScreenState extends State<AutomaticDetectionScreen> {
+class _AutomaticDetectionScreenState extends State<AutomaticDetectionScreen>
+    with WidgetsBindingObserver {
   bool _smsDetection = true;
+  bool _notifDetection = false;
   bool _transactionReview = true;
   bool _storeOriginalSms = false;
   bool _isSyncing = false;
@@ -20,20 +23,40 @@ class _AutomaticDetectionScreenState extends State<AutomaticDetectionScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkInitialPermissions();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkInitialPermissions();
+    }
+  }
+
   Future<void> _checkInitialPermissions() async {
-    final granted = await SmsParserService.instance.checkPermissions();
+    final smsGranted = await SmsParserService.instance.checkPermissions();
+    final notifGranted =
+        await NotificationParserService.instance.checkPermission();
     if (mounted) {
       setState(() {
-        _smsDetection = granted;
+        _smsDetection = smsGranted;
+        _notifDetection = notifGranted;
       });
     }
   }
 
   int get _configuredCount {
-    return _smsDetection ? 3 : 2;
+    int count = 2;
+    if (_smsDetection) count++;
+    if (_notifDetection) count++;
+    return count;
   }
 
   Future<void> _onToggleSmsDetection(bool val) async {
@@ -74,19 +97,75 @@ class _AutomaticDetectionScreenState extends State<AutomaticDetectionScreen> {
     }
   }
 
+  Future<void> _onToggleNotifDetection(bool val) async {
+    if (val) {
+      final isGranted =
+          await NotificationParserService.instance.checkPermission();
+      if (isGranted) {
+        setState(() => _notifDetection = true);
+        return;
+      }
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.notifications_active_rounded, color: AppTheme.primary),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Enable Notification Reader',
+                  style: TextStyle(fontFamily: 'Inter', fontSize: 17, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'To detect transactions from Google Pay, PhonePe, Paytm, CRED & Banks without relying on SMS, please allow Notification Access in Android Settings.',
+            style: TextStyle(fontFamily: 'Inter', fontSize: 13.5, color: AppTheme.textSecondary, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(fontFamily: 'Inter', color: AppTheme.textSecondary)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await NotificationParserService.instance.requestPermission();
+              },
+              child: const Text('Open Settings', style: TextStyle(fontFamily: 'Inter', color: Colors.white, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      );
+    } else {
+      setState(() => _notifDetection = false);
+    }
+  }
+
   void _handleSync() async {
     setState(() {
       _isSyncing = true;
     });
 
-    final addedCount = await SmsParserService.instance.syncInboxMessages(limit: 60);
+    final smsAdded = await SmsParserService.instance.syncInboxMessages(limit: 60);
+    final notifAdded = await NotificationParserService.instance.syncBufferedNotifications();
+    final totalAdded = smsAdded + notifAdded;
 
     if (!mounted) return;
     setState(() {
       _isSyncing = false;
     });
 
-    if (addedCount > 0) {
+    if (totalAdded > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -94,7 +173,7 @@ class _AutomaticDetectionScreenState extends State<AutomaticDetectionScreen> {
               const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
               const SizedBox(width: 8),
               Text(
-                'Synced $addedCount new transaction SMS alerts!',
+                'Synced $totalAdded new transaction alerts!',
                 style: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w500),
               ),
             ],
@@ -112,8 +191,8 @@ class _AutomaticDetectionScreenState extends State<AutomaticDetectionScreen> {
         SnackBar(
           content: Text(
             hasPermission
-                ? 'Inbox scanned. No new bank/UPI transaction SMS found.'
-                : 'SMS permission is required to scan your inbox.',
+                ? 'All latest bank/UPI SMS and notifications are up to date!'
+                : 'SMS or Notification permission required to scan alerts.',
             style: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w500),
           ),
           backgroundColor: hasPermission ? AppTheme.primary : AppTheme.tertiary,
@@ -595,6 +674,14 @@ class _AutomaticDetectionScreenState extends State<AutomaticDetectionScreen> {
             subtitle: 'Scan incoming banking alerts',
             value: _smsDetection,
             onChanged: (val) => _onToggleSmsDetection(val),
+          ),
+          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
+          _buildToggleRow(
+            icon: Icons.notifications_active_outlined,
+            title: 'UPI & App Notifications',
+            subtitle: 'Auto-detect from GPay, PhonePe, Paytm, CRED',
+            value: _notifDetection,
+            onChanged: (val) => _onToggleNotifDetection(val),
           ),
           const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
           _buildToggleRow(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/services/sms_parser_service.dart';
+import '../../../core/services/notification_parser_service.dart';
 import '../../expenses/models/pending_sms_model.dart';
 import '../../expenses/models/transaction_model.dart';
 import '../../expenses/repositories/transaction_repository.dart';
@@ -28,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   PendingSmsModel? _latestPending;
   List<TransactionModel> _recentTxns = [];
   StreamSubscription<PendingSmsModel>? _smsSubscription;
+  StreamSubscription<PendingSmsModel>? _notifSubscription;
 
   double _todaySpent = 0.0;
   int _todayOrders = 0;
@@ -42,10 +44,16 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadHomeData();
     _setupRealtimeListener();
+    NotificationParserService.instance.syncBufferedNotifications();
   }
 
   void _setupRealtimeListener() {
     _smsSubscription = SmsParserService.instance.onIncomingSms.listen((_) {
+      if (mounted) {
+        _loadHomeData();
+      }
+    });
+    _notifSubscription = NotificationParserService.instance.onIncomingNotification.listen((_) {
       if (mounted) {
         _loadHomeData();
       }
@@ -55,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _smsSubscription?.cancel();
+    _notifSubscription?.cancel();
     super.dispose();
   }
 
@@ -94,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _handleRefresh() async {
     try {
       await SmsParserService.instance.syncInboxMessages(limit: 150);
+      await NotificationParserService.instance.syncBufferedNotifications();
     } catch (_) {}
     await _loadHomeData();
   }

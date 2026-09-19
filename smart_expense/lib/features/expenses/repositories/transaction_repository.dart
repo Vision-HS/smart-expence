@@ -153,6 +153,62 @@ class TransactionRepository {
     );
   }
 
+  /// Checks if a transaction or pending item with the same amount and type was recorded recently (within ~10 minutes)
+  Future<bool> isDuplicateRecent({
+    required double amount,
+    required bool isIncome,
+    required DateTime timestamp,
+  }) async {
+    try {
+      final db = await _dbHelper.database;
+
+      // 1. Check pending_sms
+      final pendingRows = await db.query(
+        'pending_sms',
+        where: 'isIncome = ?',
+        whereArgs: [isIncome ? 1 : 0],
+      );
+
+      for (final row in pendingRows) {
+        final pAmount = (row['amount'] as num?)?.toDouble() ?? 0.0;
+        if ((pAmount - amount).abs() < 0.01) {
+          final dtStr = row['dateTime'] as String?;
+          if (dtStr != null) {
+            final dt = DateTime.tryParse(dtStr);
+            if (dt != null && dt.difference(timestamp).abs().inMinutes <= 10) {
+              return true;
+            }
+          } else {
+            return true;
+          }
+        }
+      }
+
+      // 2. Check confirmed transactions
+      final txnRows = await db.query(
+        'transactions',
+        where: 'isIncome = ?',
+        whereArgs: [isIncome ? 1 : 0],
+        orderBy: 'id DESC',
+        limit: 30,
+      );
+
+      for (final row in txnRows) {
+        final tAmount = (row['amount'] as num?)?.toDouble() ?? 0.0;
+        if ((tAmount.abs() - amount).abs() < 0.01) {
+          final dtStr = row['dateTime'] as String?;
+          if (dtStr != null) {
+            final dt = DateTime.tryParse(dtStr);
+            if (dt != null && dt.difference(timestamp).abs().inMinutes <= 10) {
+              return true;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
+
   /// Automatically synchronizes and fixes any transaction where monthYear does not match dateTime
   Future<int> syncAndFixTransactionMonths() async {
     try {
