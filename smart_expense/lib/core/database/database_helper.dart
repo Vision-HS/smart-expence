@@ -187,7 +187,7 @@ class DatabaseHelper {
     try {
       await db.delete(
         'pending_sms',
-        where: "id IN ('sms_1', 'sms_2', 'sms_sep_01', 'sms_sep_02') OR merchant IN ('Rahul', 'Amazon')",
+        where: "id IN ('sms_1', 'sms_2', 'sms_sep_01', 'sms_sep_02') OR merchant IN ('Rahul', 'Amazon') OR LOWER(merchant) LIKE '%loan%' OR LOWER(merchant) LIKE '%offer%' OR LOWER(merchant) LIKE '%voucher%' OR LOWER(merchant) LIKE '%cashback%' OR LOWER(merchant) LIKE '%congrat%' OR LOWER(merchant) LIKE '%pre-approved%'",
       );
     } catch (_) {}
     try {

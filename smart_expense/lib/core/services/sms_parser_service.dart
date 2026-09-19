@@ -196,6 +196,11 @@ class SmsParserService {
         lowerBody.contains('login code') ||
         lowerBody.contains('secret code');
 
+    // 2. Skip promotional, advertising, loan offers, and non-transaction SMS
+    if (_isPromotionalOrNonTransaction(body, lowerBody)) {
+      return null;
+    }
+
     final isFinancial = lowerBody.contains('debited') ||
         lowerBody.contains('debit') ||
         lowerBody.contains('spent') ||
@@ -227,18 +232,17 @@ class SmsParserService {
     if (isOtp && !isFinancial) return null;
     if (!isFinancial) return null;
 
-    // 2. Extract Amount
+    // 3. Extract Amount
     double? amount;
 
     // Regex handles:
-    // - Rs. 500, Rs.500/-, Rs 1,200.50
-    // - INR 450, INR 1,499.00
-    // - ₹350, ₹ 1,200
-    // - debited by Rs 400, paid 250, spent INR 500
+    // - debited by Rs 400, paid 250, spent INR 500, credited with Rs 1,000
+    // - 250 debited, 1,200 credited
+    // - Rs. 500, Rs.500/-, Rs 1,200.50, INR 450, ₹350
     final amountPatterns = [
-      RegExp(r'(?:Rs\.?|INR|\u20B9)\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
-      RegExp(r'(?:debited|spent|paid|withdrawn|credited|transferred|sent|deducted|payment of|txn of)\s+(?:by|for|of|with)?\s*(?:Rs\.?|INR|\u20B9)?\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
+      RegExp(r'(?:debited|spent|paid|withdrawn|credited|transferred|sent|deducted|payment of|txn of)\s+(?:by|for|of|with|to)?\s*(?:Rs\.?|INR|\u20B9)?\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
       RegExp(r'([\d,]+(?:\.\d{1,2})?)\s*(?:Rs\.?|INR|\u20B9)?\s*(?:debited|spent|paid|withdrawn|credited|transferred|deducted)', caseSensitive: false),
+      RegExp(r'(?:Rs\.?|INR|\u20B9)\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false),
     ];
 
     for (final pattern in amountPatterns) {
@@ -309,6 +313,135 @@ class SmsParserService {
       isIncome: isIncome,
       dateTime: dateTime.toIso8601String(),
     );
+  }
+
+  bool _isPromotionalOrNonTransaction(String body, String lowerBody) {
+    // 1. Pure Balance inquiries or statements without actual debit/credit verbs
+    final isPureBalanceInquiry = (lowerBody.contains('available balance') ||
+            lowerBody.contains('avl bal') ||
+            lowerBody.contains('clear bal') ||
+            lowerBody.contains('mini statement') ||
+            lowerBody.contains('balance inquiry') ||
+            lowerBody.contains('closing balance')) &&
+        !lowerBody.contains('debited') &&
+        !lowerBody.contains('credited') &&
+        !lowerBody.contains('spent') &&
+        !lowerBody.contains('paid') &&
+        !lowerBody.contains('withdrawn');
+
+    if (isPureBalanceInquiry) return true;
+
+    // 2. Promotional, Loan & Marketing Triggers
+    final promotionalTriggers = [
+      'pre-approved',
+      'pre approved',
+      'pre-qualified',
+      'pre qualified',
+      'eligible for',
+      'apply now',
+      'apply today',
+      'apply online',
+      'apply here',
+      'apply for',
+      'special offer',
+      'exclusive offer',
+      'limited period offer',
+      'limited time offer',
+      'festive offer',
+      'bumper offer',
+      'gift voucher',
+      'voucher worth',
+      'coupon code',
+      'use coupon',
+      'use promo code',
+      'use code',
+      'flat off',
+      'flat discount',
+      'cashback of up to',
+      'cashback up to',
+      'win up to',
+      'chance to win',
+      'stand a chance',
+      'lucky winner',
+      'get instant loan',
+      'instant personal loan',
+      'instant loan',
+      'instant cash',
+      'paperless loan',
+      'avail instant',
+      'avail now',
+      'low interest rate',
+      'interest rate starting',
+      'rate starting at',
+      'zero processing fee',
+      'no cost emi',
+      'zero making charges',
+      'upgrade your limit',
+      'enhance your limit',
+      'credit limit increase',
+      'increase your limit',
+      'upgrade your credit card',
+      'apply for credit card',
+      'lifetime free credit card',
+      'free credit report',
+      'check credit score',
+      'check cibil',
+      'insurance cover of',
+      'term plan of',
+      'invest in mutual',
+      'open fixed deposit',
+      'open fd',
+      'give missed call',
+      'missed call to',
+      'click to apply',
+      'click to avail',
+      'click to activate',
+      'tap to claim',
+      'claim now',
+      'claim your',
+      'hurry, offer valid',
+      'offer valid till',
+      'offer valid until',
+      'valid till',
+      'valid until',
+    ];
+
+    for (final trigger in promotionalTriggers) {
+      if (lowerBody.contains(trigger)) {
+        // Check if there is an unambiguous actual completed transaction sentence with an account
+        final hasCompletedTxnVerb = lowerBody.contains('has been debited') ||
+            lowerBody.contains('is debited for') ||
+            lowerBody.contains('is debited by') ||
+            lowerBody.contains('has been credited') ||
+            lowerBody.contains('is credited with') ||
+            lowerBody.contains('is credited by') ||
+            lowerBody.contains('salary of');
+
+        final hasAccountMention = lowerBody.contains('a/c') ||
+            lowerBody.contains('acct') ||
+            lowerBody.contains('account') ||
+            lowerBody.contains('card xx') ||
+            lowerBody.contains('card ending');
+
+        // If it's not a verified completed debit/credit on an account, it's definitely promotional
+        if (!hasCompletedTxnVerb || !hasAccountMention) {
+          return true;
+        }
+
+        // Even with an account mention, if it has explicit marketing calls to action, it's promotional
+        if (lowerBody.contains('apply now') ||
+            lowerBody.contains('eligible for') ||
+            lowerBody.contains('pre-approved') ||
+            lowerBody.contains('pre approved') ||
+            lowerBody.contains('give missed call') ||
+            lowerBody.contains('click to apply') ||
+            lowerBody.contains('claim now')) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   bool _detectIsIncome(String body, String lowerBody) {

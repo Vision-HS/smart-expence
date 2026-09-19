@@ -146,5 +146,61 @@ void main() {
 
       expect(result, isNull);
     });
+
+    test('Skips bank loan and pre-approved promotional messages', () {
+      const loanSms =
+          'Congratulations! You are eligible for a pre-approved personal loan of Rs. 5,00,000 at low interest. Apply now: https://bank.in/loan';
+      const sender = 'AD-HDFCBK';
+
+      final result = parser.parseSms(
+        body: loanSms,
+        sender: sender,
+        timestamp: now,
+      );
+
+      expect(result, isNull);
+    });
+
+    test('Skips credit card cashback and discount offers', () {
+      const promoSms =
+          'Get Rs 500 cashback on your next credit card spend of Rs 2000. Use code SAVE500. Offer valid till 30 Sep.';
+      const sender = 'AX-ICICIB';
+
+      final result = parser.parseSms(
+        body: promoSms,
+        sender: sender,
+        timestamp: now,
+      );
+
+      expect(result, isNull);
+    });
+
+    test('Skips credit card limit enhancement marketing', () {
+      const limitSms =
+          'Dear Customer, upgrade your HDFC Bank Credit Card limit to Rs. 3,50,000. Give missed call to 18001234.';
+      const sender = 'VM-HDFCBK';
+
+      final result = parser.parseSms(
+        body: limitSms,
+        sender: sender,
+        timestamp: now,
+      );
+
+      expect(result, isNull);
+    });
+
+    test('Skips pure balance inquiry messages without debit/credit verbs', () {
+      const balSms =
+          'Available balance in your account A/C **1234 is Rs. 15,400.00. - State Bank of India';
+      const sender = 'AX-SBIINB';
+
+      final result = parser.parseSms(
+        body: balSms,
+        sender: sender,
+        timestamp: now,
+      );
+
+      expect(result, isNull);
+    });
   });
 }
