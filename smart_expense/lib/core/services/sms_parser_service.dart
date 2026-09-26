@@ -8,9 +8,9 @@ class SmsParserService {
   static final SmsParserService instance = SmsParserService._init();
 
   static const MethodChannel _methodChannel =
-      MethodChannel('com.example.smart_expense/sms_channel');
+      MethodChannel('com.visionhs.smartexpense/sms_channel');
   static const EventChannel _eventChannel =
-      EventChannel('com.example.smart_expense/sms_stream');
+      EventChannel('com.visionhs.smartexpense/sms_stream');
 
   StreamController<PendingSmsModel>? _streamController;
   StreamSubscription? _nativeSubscription;

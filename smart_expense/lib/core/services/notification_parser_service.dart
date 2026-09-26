@@ -8,9 +8,9 @@ class NotificationParserService {
       NotificationParserService._init();
 
   static const MethodChannel _methodChannel =
-      MethodChannel('com.example.smart_expense/notification_channel');
+      MethodChannel('com.visionhs.smartexpense/notification_channel');
   static const EventChannel _eventChannel =
-      EventChannel('com.example.smart_expense/notification_stream');
+      EventChannel('com.visionhs.smartexpense/notification_stream');
 
   StreamController<PendingSmsModel>? _streamController;
   StreamSubscription? _nativeSubscription;

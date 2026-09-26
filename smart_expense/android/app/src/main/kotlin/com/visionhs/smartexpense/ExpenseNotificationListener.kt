@@ -1,4 +1,4 @@
-package com.example.smart_expense
+package com.visionhs.smartexpense
 
 import android.app.Notification
 import android.content.Context

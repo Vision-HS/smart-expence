@@ -1,4 +1,4 @@
-package com.example.smart_expense
+package com.visionhs.smartexpense
 
 import android.Manifest
 import android.content.Intent
@@ -15,10 +15,10 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val METHOD_CHANNEL = "com.example.smart_expense/sms_channel"
-    private val EVENT_CHANNEL = "com.example.smart_expense/sms_stream"
-    private val NOTIF_METHOD_CHANNEL = "com.example.smart_expense/notification_channel"
-    private val NOTIF_EVENT_CHANNEL = "com.example.smart_expense/notification_stream"
+    private val METHOD_CHANNEL = "com.visionhs.smartexpense/sms_channel"
+    private val EVENT_CHANNEL = "com.visionhs.smartexpense/sms_stream"
+    private val NOTIF_METHOD_CHANNEL = "com.visionhs.smartexpense/notification_channel"
+    private val NOTIF_EVENT_CHANNEL = "com.visionhs.smartexpense/notification_stream"
     private val PERMISSION_REQUEST_CODE = 1010
 
     private var permissionResultCallback: MethodChannel.Result? = null

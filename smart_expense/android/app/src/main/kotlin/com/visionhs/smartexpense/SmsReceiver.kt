@@ -1,4 +1,4 @@
-package com.example.smart_expense
+package com.visionhs.smartexpense
 
 import android.content.BroadcastReceiver
 import android.content.Context
