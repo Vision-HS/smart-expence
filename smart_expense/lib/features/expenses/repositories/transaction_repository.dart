@@ -337,6 +337,26 @@ class TransactionRepository {
     return Sqflite.firstIntValue(res) ?? 0;
   }
 
+  /// Get transaction counts for all categories mapped by lowercase name
+  Future<Map<String, int>> getAllCategoryCounts() async {
+    try {
+      final db = await _dbHelper.database;
+      final res = await db.rawQuery(
+        'SELECT category, COUNT(*) as cnt FROM transactions GROUP BY category',
+      );
+      final Map<String, int> counts = {};
+      for (final r in res) {
+        final cat = r['category']?.toString();
+        if (cat != null) {
+          counts[cat.toLowerCase().trim()] = (r['cnt'] as num?)?.toInt() ?? 0;
+        }
+      }
+      return counts;
+    } catch (_) {
+      return {};
+    }
+  }
+
   /// Get transactions for a given category
   Future<List<TransactionModel>> getTransactionsByCategory(String category) async {
     final db = await _dbHelper.database;

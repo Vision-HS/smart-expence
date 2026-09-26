@@ -37,7 +37,14 @@ class _HomeScreenState extends State<HomeScreen> {
   double _monthSpent = 0.0;
   List<Map<String, dynamic>> _homeCategorySummary = [];
   String _currentMonth = TransactionModel.formatMonthYear(DateTime.now());
-  String _displayName = 'Hiren';
+  String _displayName = 'User';
+
+  String _getTimeGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
 
   @override
   void initState() {
@@ -215,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Good morning, $_displayName',
+              '${_getTimeGreeting()}, $_displayName',
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,

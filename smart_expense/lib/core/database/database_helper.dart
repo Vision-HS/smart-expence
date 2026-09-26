@@ -280,6 +280,56 @@ class DatabaseHelper {
     } catch (_) {}
   }
 
+  Future<void> saveUserProfile({
+    required String displayName,
+    String? email,
+    String? phone,
+    String? photoUrl,
+    String? authProvider,
+  }) async {
+    await setSetting('display_name', displayName);
+    if (email != null && email.isNotEmpty) {
+      await setSetting('user_email', email);
+    }
+    if (phone != null && phone.isNotEmpty) {
+      await setSetting('user_phone', phone);
+    }
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      await setSetting('user_photo', photoUrl);
+    }
+    if (authProvider != null && authProvider.isNotEmpty) {
+      await setSetting('auth_provider', authProvider);
+    }
+    await setSetting('is_logged_in', 'true');
+  }
+
+  Future<Map<String, String?>> getUserProfile() async {
+    final name = await getSetting('display_name');
+    final email = await getSetting('user_email');
+    final phone = await getSetting('user_phone');
+    final photo = await getSetting('user_photo');
+    final provider = await getSetting('auth_provider');
+    final loggedIn = await getSetting('is_logged_in');
+
+    return {
+      'displayName': name,
+      'email': email,
+      'phone': phone,
+      'photoUrl': photo,
+      'authProvider': provider,
+      'isLoggedIn': loggedIn,
+    };
+  }
+
+  Future<bool> isUserLoggedIn() async {
+    final flag = await getSetting('is_logged_in');
+    return flag == 'true';
+  }
+
+  Future<void> logoutUser() async {
+    await setSetting('is_logged_in', 'false');
+  }
+
   Future<int> getTransactionCount() async {
     try {
       final db = await database;

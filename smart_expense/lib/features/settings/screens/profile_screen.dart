@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/auth_service.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../expenses/repositories/transaction_repository.dart';
 
@@ -14,7 +15,10 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _biometricUnlock = true;
-  String _displayName = 'Hiren';
+  String _displayName = 'User';
+  String _email = '';
+  String _phone = '';
+  String _authProvider = 'Local';
   String _lastBackupTime = 'Yesterday, 11:30 PM';
   int _backupCount = 3;
   int _transactionCount = 8;
@@ -29,13 +33,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadProfile() async {
     try {
-      final savedName = await DatabaseHelper.instance.getSetting('display_name');
+      final profile = await DatabaseHelper.instance.getUserProfile();
       final bio = await DatabaseHelper.instance.getSetting('biometric_unlock');
       if (mounted) {
         setState(() {
+          final savedName = profile['displayName'];
           if (savedName != null && savedName.trim().isNotEmpty) {
             _displayName = savedName.trim();
           }
+          _email = profile['email'] ?? '';
+          _phone = profile['phone'] ?? '';
+          _authProvider = profile['authProvider'] ?? 'Local';
           if (bio != null) {
             _biometricUnlock = bio == 'true';
           }
@@ -83,8 +91,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _handleLockSession() {
+  void _handleLockSession() async {
     HapticFeedback.heavyImpact();
+    await AuthService.instance.signOut();
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Row(
@@ -92,7 +102,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Icon(Icons.lock_rounded, color: Colors.white, size: 18),
             SizedBox(width: 8),
             Text(
-              'Session locked. PIN or Biometric required.',
+              'Logged out. Please sign in again.',
               style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w500),
             ),
           ],
@@ -593,8 +603,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
+                        children: [
+                          const Text(
                             'Phone (SMS Sync)',
                             style: TextStyle(
                               fontFamily: 'Inter',
@@ -603,10 +613,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: Color(0xFF767586),
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
-                            '+91 98765 24012',
-                            style: TextStyle(
+                            _phone.isNotEmpty ? _phone : 'Not Linked',
+                            style: const TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
@@ -658,8 +668,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
+                        children: [
+                          const Text(
                             'Email Address',
                             style: TextStyle(
                               fontFamily: 'Inter',
@@ -668,10 +678,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: Color(0xFF767586),
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
-                            'hiren \u2022 hs@email.com',
-                            style: TextStyle(
+                            _email.isNotEmpty ? _email : 'Not Linked',
+                            style: const TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
@@ -744,6 +754,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ],
                   ),
+                ),
+              ),
+              const Divider(height: 1, indent: 66, endIndent: 14, color: Color(0xFFF1F5F9)),
+              // Auth Provider Row
+              Padding(
+                padding: const EdgeInsets.all(14.0),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAEDFF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.security_rounded,
+                        color: Color(0xFF4648D4),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Auth Method',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF767586),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _authProvider.isNotEmpty ? _authProvider : 'Offline Local',
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'Active',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1D4ED8),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

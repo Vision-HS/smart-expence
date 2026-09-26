@@ -7,7 +7,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Smart Expense'), findsWidgets);
-    expect(find.text('Create 4-Digit PIN'), findsOneWidget);
-    expect(find.text('Step 1 of 2: Enter 4 digits'), findsOneWidget);
+    expect(find.text('Phone OTP'), findsOneWidget);
+    expect(find.text('Google'), findsOneWidget);
+    expect(find.text('Get OTP'), findsOneWidget);
   });
 }
