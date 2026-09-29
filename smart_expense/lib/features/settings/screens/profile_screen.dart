@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_notifier.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/widgets/neumorphic/neu_card.dart';
+import '../../../core/widgets/neumorphic/neu_inset.dart';
+import '../../../core/widgets/neumorphic/neu_button.dart';
+import '../../../core/widgets/neumorphic/neu_icon_button.dart';
+import '../../../core/widgets/neumorphic/neu_switch.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../expenses/repositories/transaction_repository.dart';
 
@@ -370,8 +376,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canvasColor = AppTheme.getCanvas(context);
+
     return Scaffold(
-      backgroundColor: AppTheme.canvas,
+      backgroundColor: canvasColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -382,6 +390,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildTopBar(context),
               const SizedBox(height: 16),
               _buildHeroProfileCard(),
+              const SizedBox(height: 20),
+              _buildThemeModeSection(),
               const SizedBox(height: 24),
               _buildPersonalDetailsSection(),
               const SizedBox(height: 24),
@@ -404,37 +414,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 1. Top Bar: Back arrow + "Profile" + user avatar icon
   Widget _buildTopBar(BuildContext context) {
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final primary = AppTheme.getPrimary(context);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: AppTheme.textPrimary,
-            size: 24,
-          ),
-          onPressed: () => Navigator.pop(context),
+        NeuIconButton(
+          icon: Icons.arrow_back_rounded,
+          size: 40,
+          iconSize: 20,
+          onTap: () => Navigator.pop(context),
         ),
-        const Text(
+        Text(
           'Profile',
           style: TextStyle(
             fontFamily: 'Inter',
             fontSize: 22,
             fontWeight: FontWeight.w700,
-            color: AppTheme.textPrimary,
+            color: textPrimary,
             letterSpacing: -0.3,
           ),
         ),
-        Container(
-          width: 36,
-          height: 36,
-          decoration: const BoxDecoration(
-            color: AppTheme.primary,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
+        NeuCard(
+          isCircle: true,
+          depth: 3.0,
+          blur: 6.0,
+          padding: const EdgeInsets.all(8),
+          child: Icon(
             Icons.person,
-            color: Colors.white,
+            color: primary,
             size: 20,
           ),
         ),
@@ -444,34 +453,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 2. Hero Profile Card
   Widget _buildHeroProfileCard() {
-    return Container(
-      width: double.infinity,
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final textSecondary = AppTheme.getTextSecondary(context);
+    final primary = AppTheme.getPrimary(context);
+    final secondary = AppTheme.getSecondary(context);
+
+    return NeuCard(
+      borderRadius: 22,
+      depth: 4.5,
+      blur: 9.0,
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
       child: Column(
         children: [
           // Avatar with Edit Button Overlay
           Stack(
             children: [
-              Container(
-                width: 84,
-                height: 84,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE0E3FD),
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Text(
-                    'HS',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF4648D4),
+              NeuInset(
+                isCircle: true,
+                padding: const EdgeInsets.all(4),
+                child: Container(
+                  width: 78,
+                  height: 78,
+                  decoration: BoxDecoration(
+                    color: primary.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      'HS',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        color: primary,
+                      ),
                     ),
                   ),
                 ),
@@ -485,7 +500,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4648D4),
+                      color: primary,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                     ),
@@ -502,30 +517,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 12),
           Text(
             _displayName,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
+              color: textPrimary,
               letterSpacing: -0.3,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Local Ledger Member since Aug 2024',
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 12.5,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF767586),
+              color: textSecondary,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           // Offline First Account Badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFDCFCE7),
+              color: secondary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -534,25 +549,141 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Container(
                   width: 6,
                   height: 6,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF006C49),
+                  decoration: BoxDecoration(
+                    color: secondary,
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 6),
-                const Text(
+                Text(
                   'Offline First Account',
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF006C49),
+                    color: secondary,
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // 2b. Appearance & Theme Mode Section
+  Widget _buildThemeModeSection() {
+    final textSecondary = AppTheme.getTextSecondary(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'APPEARANCE & THEME',
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+            color: textSecondary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        NeuCard(
+          borderRadius: 18,
+          depth: 4.0,
+          blur: 8.0,
+          padding: const EdgeInsets.all(12),
+          child: ValueListenableBuilder<ThemeMode>(
+            valueListenable: ThemeNotifier.instance,
+            builder: (context, currentMode, _) {
+              return Row(
+                children: [
+                  _buildThemeOption(
+                    title: 'Light Soft',
+                    icon: Icons.light_mode_rounded,
+                    isSelected: currentMode == ThemeMode.light,
+                    onTap: () => ThemeNotifier.instance.setThemeMode(ThemeMode.light),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildThemeOption(
+                    title: 'Dark Soft',
+                    icon: Icons.dark_mode_rounded,
+                    isSelected: currentMode == ThemeMode.dark,
+                    onTap: () => ThemeNotifier.instance.setThemeMode(ThemeMode.dark),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildThemeOption(
+                    title: 'System',
+                    icon: Icons.brightness_auto_rounded,
+                    isSelected: currentMode == ThemeMode.system,
+                    onTap: () => ThemeNotifier.instance.setThemeMode(ThemeMode.system),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThemeOption({
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final primary = AppTheme.getPrimary(context);
+    final textMuted = AppTheme.getTextMuted(context);
+
+    if (isSelected) {
+      return Expanded(
+        child: NeuInset(
+          borderRadius: 14,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          child: Column(
+            children: [
+              Icon(icon, size: 22, color: primary),
+              const SizedBox(height: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          child: Column(
+            children: [
+              Icon(icon, size: 22, color: textMuted),
+              const SizedBox(height: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -573,12 +704,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
+        NeuCard(
+          borderRadius: 18,
+          depth: 3.5,
+          blur: 7.0,
+          padding: EdgeInsets.zero,
           child: Column(
             children: [
               // Phone (SMS Sync) Row
@@ -844,12 +974,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
+        NeuCard(
+          borderRadius: 18,
+          depth: 3.5,
+          blur: 7.0,
+          padding: EdgeInsets.zero,
           child: Column(
             children: [
               // Quick PIN Row
@@ -954,21 +1083,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                     ),
-                    Transform.scale(
-                      scale: 0.9,
-                      child: Switch(
-                        value: _biometricUnlock,
-                        onChanged: (val) {
-                          setState(() => _biometricUnlock = val);
-                          DatabaseHelper.instance.setSetting('biometric_unlock', val ? 'true' : 'false');
-                        },
-                        activeThumbColor: Colors.white,
-                        activeTrackColor: AppTheme.primary,
-                        inactiveThumbColor: Colors.white,
-                        inactiveTrackColor: const Color(0xFFD2D9F4),
-                        trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
+                    NeuSwitch(
+                      value: _biometricUnlock,
+                      onChanged: (val) {
+                        setState(() => _biometricUnlock = val);
+                        DatabaseHelper.instance.setSetting('biometric_unlock', val ? 'true' : 'false');
+                      },
                     ),
                   ],
                 ),
@@ -1047,59 +1167,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // 5. Section: LOCAL STORAGE & LEDGER
+  // 5. Section: LOCAL STORAGE & LEDGER
   Widget _buildLocalStorageAndLedgerSection() {
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final textSecondary = AppTheme.getTextSecondary(context);
+    final primary = AppTheme.getPrimary(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'LOCAL STORAGE & LEDGER',
           style: TextStyle(
             fontFamily: 'Inter',
             fontSize: 11.5,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.5,
-            color: Color(0xFF767586),
+            color: textSecondary,
           ),
         ),
         const SizedBox(height: 10),
-        Container(
+        NeuCard(
+          borderRadius: 18,
+          depth: 3.5,
+          blur: 7.0,
           padding: const EdgeInsets.all(14.0),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
           child: Column(
             children: [
               // 3 Metric Cards Row
               Row(
                 children: [
                   Expanded(
-                    child: Container(
+                    child: NeuInset(
+                      borderRadius: 12,
                       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF2F4FF),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
                       child: Column(
                         children: [
-                          const Text(
+                          Text(
                             'Transactions',
                             style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 11.5,
                               fontWeight: FontWeight.w500,
-                              color: Color(0xFF767586),
+                              color: textSecondary,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             '$_transactionCount',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
-                              color: AppTheme.textPrimary,
+                              color: textPrimary,
                             ),
                           ),
                         ],
@@ -1108,31 +1228,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Container(
+                    child: NeuInset(
+                      borderRadius: 12,
                       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF2F4FF),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
                       child: Column(
                         children: [
-                          const Text(
+                          Text(
                             'DB Size',
                             style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 11.5,
                               fontWeight: FontWeight.w500,
-                              color: Color(0xFF767586),
+                              color: textSecondary,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             '${_dbSizeMb.toStringAsFixed(2)} MB',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
-                              color: AppTheme.textPrimary,
+                              color: textPrimary,
                             ),
                           ),
                         ],
@@ -1141,31 +1258,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Container(
+                    child: NeuInset(
+                      borderRadius: 12,
                       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF2F4FF),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
                       child: Column(
                         children: [
-                          const Text(
+                          Text(
                             'Backups',
                             style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 11.5,
                               fontWeight: FontWeight.w500,
-                              color: Color(0xFF767586),
+                              color: textSecondary,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             '$_backupCount Saved',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
-                              color: AppTheme.textPrimary,
+                              color: textPrimary,
                             ),
                           ),
                         ],
@@ -1175,7 +1289,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
               const SizedBox(height: 14),
-              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              Divider(height: 1, color: AppTheme.isDark(context) ? const Color(0xFF282D3D) : const Color(0xFFF1F5F9)),
               const SizedBox(height: 12),
               // Last Local Backup & Create Backup CTA
               Row(
@@ -1184,55 +1298,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Last Local Backup',
                         style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 11.5,
                           fontWeight: FontWeight.w500,
-                          color: Color(0xFF767586),
+                          color: textSecondary,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         _lastBackupTime,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
+                          color: textPrimary,
                         ),
                       ),
                     ],
                   ),
-                  GestureDetector(
-                    onTap: _handleCreateBackup,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEAEDFF),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(
-                            Icons.cloud_upload_outlined,
-                            size: 16,
-                            color: Color(0xFF4648D4),
+                  NeuButton(
+                    isPrimary: false,
+                    height: 38,
+                    borderRadius: 10,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    onPressed: _handleCreateBackup,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.cloud_upload_outlined,
+                          size: 16,
+                          color: primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Create Backup',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: primary,
                           ),
-                          SizedBox(width: 6),
-                          Text(
-                            'Create Backup',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF4648D4),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -1246,109 +1357,101 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 6. Section: Switch Device / Profile
   Widget _buildSwitchDeviceSection() {
-    return InkWell(
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final textSecondary = AppTheme.getTextSecondary(context);
+    final primary = AppTheme.getPrimary(context);
+
+    return NeuCard(
+      borderRadius: 16,
+      depth: 3.5,
+      blur: 7.0,
+      padding: const EdgeInsets.all(14.0),
       onTap: () {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Linked to current device: Samsung Galaxy S23 FE'),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: const Color(0xFF4648D4),
+            backgroundColor: primary,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       },
-      child: Container(
-        padding: const EdgeInsets.all(14.0),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEAEDFF),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.devices_outlined,
-                color: Color(0xFF4648D4),
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'Switch Device / Profile',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Linked to Pixel-7-Loc892',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF767586),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Color(0xFF767586),
+      child: Row(
+        children: [
+          NeuInset(
+            borderRadius: 10,
+            padding: const EdgeInsets.all(8),
+            child: Icon(
+              Icons.devices_outlined,
+              color: primary,
               size: 20,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Switch Device / Profile',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Linked to Pixel-7-Loc892',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: textSecondary,
+            size: 20,
+          ),
+        ],
       ),
     );
   }
 
   // 7. Lock Current Session Button
   Widget _buildLockCurrentSessionButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          backgroundColor: const Color(0xFFFBFBFE),
-          side: const BorderSide(color: Color(0xFFE2E8F0)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        onPressed: _handleLockSession,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(
-              Icons.lock_outline_rounded,
-              color: Color(0xFFB61722),
-              size: 18,
+    final error = AppTheme.getError(context);
+
+    return NeuButton(
+      isPrimary: false,
+      height: 50,
+      borderRadius: 14,
+      onPressed: _handleLockSession,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.lock_outline_rounded,
+            color: error,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Lock Current Session',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: error,
             ),
-            SizedBox(width: 8),
-            Text(
-              'Lock Current Session',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14.5,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFFB61722),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

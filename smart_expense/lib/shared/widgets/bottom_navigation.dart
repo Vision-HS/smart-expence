@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/neumorphic/neu_card.dart';
 
 class BottomNavigation extends StatelessWidget {
   final int currentIndex;
@@ -19,7 +20,7 @@ class BottomNavigation extends StatelessWidget {
         label: 'Home',
       ),
       const _NavItem(
-        icon: Icons.receipt_long_outlined,
+        icon: Icons.receipt_long_rounded,
         label: 'Expenses',
       ),
       const _NavItem(
@@ -32,53 +33,66 @@ class BottomNavigation extends StatelessWidget {
       ),
     ];
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.surface,
-        border: Border(
-          top: BorderSide(color: AppTheme.border, width: 1),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Container(
-          height: 64,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    final primary = AppTheme.getPrimary(context);
+    final textMuted = AppTheme.getTextMuted(context);
+    final dark = AppTheme.isDark(context);
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12, top: 4),
+        child: NeuCard(
+          borderRadius: 26,
+          depth: 4.5,
+          blur: 10,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(items.length, (index) {
               final isSelected = currentIndex == index;
               final item = items[index];
 
-              return InkWell(
+              return GestureDetector(
                 onTap: () => onTap(index),
-                borderRadius: BorderRadius.circular(12),
+                behavior: HitTestBehavior.opaque,
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected ? AppTheme.surfaceContainerLow : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
+                    color: isSelected
+                        ? (dark
+                            ? primary.withValues(alpha: 0.2)
+                            : primary.withValues(alpha: 0.12))
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(18),
+                    border: isSelected
+                        ? Border.all(
+                            color: primary.withValues(alpha: 0.3),
+                            width: 1.0,
+                          )
+                        : null,
                   ),
-                  child: Column(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         item.icon,
-                        size: 22,
-                        color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+                        size: 20,
+                        color: isSelected ? primary : textMuted,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        item.label,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                          color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
-                          fontFamily: 'Inter',
+                      if (isSelected) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          item.label,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: primary,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -97,4 +111,3 @@ class _NavItem {
 
   const _NavItem({required this.icon, required this.label});
 }
-

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_notifier.dart';
 import 'core/services/auth_service.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/home/screens/main_wrapper_screen.dart';
@@ -22,11 +23,18 @@ class SmartExpenseApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Smart Expense',
-      theme: AppTheme.lightTheme,
-      home: isLoggedIn ? const MainWrapperScreen() : const LoginScreen(),
-      debugShowCheckedModeBanner: false,
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeNotifier.instance,
+      builder: (context, themeMode, _) {
+        return MaterialApp(
+          title: 'Smart Expense',
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeMode,
+          home: isLoggedIn ? const MainWrapperScreen() : const LoginScreen(),
+          debugShowCheckedModeBanner: false,
+        );
+      },
     );
   }
 }

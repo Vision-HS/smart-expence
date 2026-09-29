@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/neumorphic/neu_card.dart';
+import '../../../core/widgets/neumorphic/neu_inset.dart';
+import '../../../core/widgets/neumorphic/neu_button.dart';
+import '../../../core/widgets/neumorphic/neu_icon_button.dart';
 import '../../expenses/models/transaction_model.dart';
 import '../../expenses/repositories/transaction_repository.dart';
 import '../../transactions/screens/sms_detection_screen.dart';
@@ -150,12 +154,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canvasColor = AppTheme.getCanvas(context);
+    final primary = AppTheme.getPrimary(context);
+
     return Scaffold(
-      backgroundColor: AppTheme.surface,
+      backgroundColor: canvasColor,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadReportData,
-          color: AppTheme.primary,
+          color: primary,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -165,9 +172,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 const SizedBox(height: 12),
                 _buildTopBar(context),
                 if (_isLoading)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 4),
-                    child: LinearProgressIndicator(minHeight: 2, color: AppTheme.primary),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: LinearProgressIndicator(minHeight: 2, color: primary),
                   )
                 else
                   const SizedBox(height: 8),
@@ -196,48 +203,52 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   // 1. Top Bar: "Reports" title + notification bell + user avatar
   Widget _buildTopBar(BuildContext context) {
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final primary = AppTheme.getPrimary(context);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text(
+        Text(
           'Reports',
           style: TextStyle(
             fontFamily: 'Inter',
             fontSize: 26,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.w800,
+            color: textPrimary,
             letterSpacing: -0.5,
           ),
         ),
         Row(
           children: [
-            IconButton(
-              icon: const Icon(
-                Icons.notifications_none_rounded,
-                color: AppTheme.textPrimary,
-                size: 24,
-              ),
-              onPressed: () {
+            NeuIconButton(
+              icon: Icons.notifications_none_rounded,
+              size: 40,
+              iconSize: 20,
+              onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const SmsDetectionScreen()),
                 );
               },
             ),
-            const SizedBox(width: 4),
-            InkWell(
+            const SizedBox(width: 10),
+            NeuCard(
+              borderRadius: 20,
+              depth: 3.5,
+              blur: 6.0,
+              padding: EdgeInsets.zero,
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const ProfileScreen()),
                 );
               },
-              borderRadius: BorderRadius.circular(18),
               child: Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  color: AppTheme.primary,
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: primary,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -258,36 +269,41 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final currentIdx = _availableMonths.indexOf(_selectedMonth);
     final hasPrev = currentIdx < _availableMonths.length - 1;
     final hasNext = currentIdx > 0;
+    final primary = AppTheme.getPrimary(context);
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final textSecondary = AppTheme.getTextSecondary(context);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
-          children: const [
-            Icon(
-              Icons.show_chart_rounded,
-              color: AppTheme.primary,
-              size: 20,
+          children: [
+            NeuInset(
+              borderRadius: 8,
+              padding: const EdgeInsets.all(6),
+              child: Icon(
+                Icons.show_chart_rounded,
+                color: primary,
+                size: 16,
+              ),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
               'Monthly Pulse',
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
+                color: textPrimary,
               ),
             ),
           ],
         ),
-        Container(
+        NeuCard(
+          borderRadius: 12,
+          depth: 3.0,
+          blur: 6.0,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
-          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -295,27 +311,27 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 onTap: hasPrev ? _previousMonth : null,
                 child: Icon(
                   Icons.chevron_left_rounded,
-                  size: 18,
-                  color: hasPrev ? AppTheme.textSecondary : AppTheme.border,
+                  size: 20,
+                  color: hasPrev ? textPrimary : textSecondary.withValues(alpha: 0.4),
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 6),
               Text(
                 _selectedMonth.isNotEmpty ? _selectedMonth : 'Loading...',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Inter',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: textPrimary,
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 6),
               InkWell(
                 onTap: hasNext ? _nextMonth : null,
                 child: Icon(
                   Icons.chevron_right_rounded,
-                  size: 18,
-                  color: hasNext ? AppTheme.textSecondary : AppTheme.border,
+                  size: 20,
+                  color: hasNext ? textPrimary : textSecondary.withValues(alpha: 0.4),
                 ),
               ),
             ],
@@ -327,13 +343,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   // 3. Total Spending Hero Card
   Widget _buildTotalSpendingCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
+    final primary = AppTheme.getPrimary(context);
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final textSecondary = AppTheme.getTextSecondary(context);
+
+    return NeuCard(
+      borderRadius: 20,
+      depth: 4.5,
+      blur: 9.0,
+      padding: const EdgeInsets.all(18),
       child: Column(
         children: [
           Row(
@@ -343,73 +361,67 @@ class _ReportsScreenState extends State<ReportsScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Total Spending',
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 12.5,
-                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      color: textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
                       Text(
                         '₹${_formatCurrency(_totalSpent)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          color: textPrimary,
                           letterSpacing: -0.5,
                         ),
                       ),
-                      const Text(
+                      Text(
                         '.00',
                         style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.textSecondary,
+                          color: textSecondary,
                         ),
                       ),
                     ],
                   ),
                 ],
               ),
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
+              NeuInset(
+                borderRadius: 12,
+                padding: const EdgeInsets.all(10),
+                child: Icon(
                   Icons.account_balance_wallet_outlined,
-                  color: AppTheme.primary,
+                  color: primary,
                   size: 22,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE6F7F0),
-                  borderRadius: BorderRadius.circular(12),
-                ),
+              NeuInset(
+                borderRadius: 12,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 child: Row(
                   children: [
                     const Icon(
                       Icons.arrow_downward_rounded,
                       size: 13,
-                      color: Color(0xFF006C49),
+                      color: Color(0xFF10B981),
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -418,19 +430,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         fontFamily: 'Inter',
                         fontSize: 11.5,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF006C49),
+                        color: Color(0xFF10B981),
                       ),
                     ),
                   ],
                 ),
               ),
-              Text(
-                'Net: ₹${_formatCurrency(_totalReceived - _totalSpent)}',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: (_totalReceived - _totalSpent) >= 0 ? const Color(0xFF006C49) : const Color(0xFFBA1A1A),
+              NeuInset(
+                borderRadius: 12,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                child: Text(
+                  'Net: ₹${_formatCurrency(_totalReceived - _totalSpent)}',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: (_totalReceived - _totalSpent) >= 0
+                        ? const Color(0xFF10B981)
+                        : (AppTheme.isDark(context) ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
+                  ),
                 ),
               ),
             ],
@@ -443,41 +461,39 @@ class _ReportsScreenState extends State<ReportsScreen> {
   // 4. Smart Tip Banner
   Widget _buildSmartTipBanner() {
     final highestCat = _categorySummary.isNotEmpty ? _categorySummary.first['category'] : 'daily expenses';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F3FF),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD2D9F4)),
-      ),
+    final primary = AppTheme.getPrimary(context);
+    final textPrimary = AppTheme.getTextPrimary(context);
+
+    return NeuCard(
+      borderRadius: 16,
+      depth: 3.5,
+      blur: 7.0,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(5),
-            decoration: const BoxDecoration(
-              color: AppTheme.primary,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
+          NeuInset(
+            borderRadius: 10,
+            padding: const EdgeInsets.all(7),
+            child: Icon(
               Icons.auto_awesome,
-              size: 13,
-              color: Colors.white,
+              size: 15,
+              color: primary,
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: RichText(
               text: TextSpan(
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 12.5,
-                  color: Color(0xFF334155),
+                  color: textPrimary,
                   height: 1.35,
                 ),
                 children: [
-                  const TextSpan(
+                  TextSpan(
                     text: 'Smart Insight: ',
-                    style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.primary),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: primary),
                   ),
                   TextSpan(
                     text: _totalSpent > 0
@@ -495,18 +511,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   // 5. Expense Trend Section
   Widget _buildExpenseTrendSection() {
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final textSecondary = AppTheme.getTextSecondary(context);
+    final primary = AppTheme.getPrimary(context);
+    final isDark = AppTheme.isDark(context);
+
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
+          children: [
             Text(
               'Expense Trend',
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
+                color: textPrimary,
               ),
             ),
             Text(
@@ -515,26 +536,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 fontFamily: 'Inter',
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
-                color: AppTheme.primary,
+                color: primary,
               ),
             ),
           ],
         ),
         const SizedBox(height: 10),
-        Container(
+        NeuCard(
+          borderRadius: 20,
+          depth: 4.0,
+          blur: 8.0,
           padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
           child: Column(
             children: [
               SizedBox(
                 height: 140,
                 width: double.infinity,
                 child: CustomPaint(
-                  painter: _ExpenseTrendChartPainter(),
+                  painter: _ExpenseTrendChartPainter(isDark: isDark),
                 ),
               ),
               const SizedBox(height: 10),
@@ -542,12 +561,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 padding: const EdgeInsets.only(left: 32.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text('Day 1', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppTheme.textSecondary)),
-                    Text('Day 7', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppTheme.textSecondary)),
-                    Text('Day 14', style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.primary)),
-                    Text('Day 21', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppTheme.textSecondary)),
-                    Text('Day 28', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: AppTheme.textSecondary)),
+                  children: [
+                    Text('Day 1', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: textSecondary)),
+                    Text('Day 7', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: textSecondary)),
+                    Text('Day 14', style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w700, color: primary)),
+                    Text('Day 21', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: textSecondary)),
+                    Text('Day 28', style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: textSecondary)),
                   ],
                 ),
               ),
@@ -560,45 +579,46 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   // 6. Category Breakdown Section (Fully Dynamic)
   Widget _buildCategoryBreakdownSection() {
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final textSecondary = AppTheme.getTextSecondary(context);
+
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Category Breakdown',
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
+                color: textPrimary,
               ),
             ),
             Text(
               '${_categorySummary.length} Categories',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 12,
-                color: AppTheme.textSecondary,
+                color: textSecondary,
               ),
             ),
           ],
         ),
         const SizedBox(height: 10),
-        Container(
+        NeuCard(
+          borderRadius: 20,
+          depth: 4.0,
+          blur: 8.0,
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
           child: _categorySummary.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
                   child: Center(
                     child: Text(
                       'No expense categories recorded for this month',
-                      style: TextStyle(fontFamily: 'Inter', color: AppTheme.textSecondary, fontSize: 13),
+                      style: TextStyle(fontFamily: 'Inter', color: textSecondary, fontSize: 13),
                     ),
                   ),
                 )
@@ -629,21 +649,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               const SizedBox(width: 8),
                               Text(
                                 catName,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: 'Inter',
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                  color: textPrimary,
                                 ),
                               ),
                               const Spacer(),
                               Text(
                                 '₹${_formatCurrency(totalVal)}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: 'Inter',
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
-                                  color: AppTheme.textPrimary,
+                                  color: textPrimary,
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -652,23 +672,31 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                 child: Text(
                                   pctStr,
                                   textAlign: TextAlign.end,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontFamily: 'Inter',
                                     fontSize: 12,
-                                    color: AppTheme.textSecondary,
+                                    color: textSecondary,
                                   ),
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 6),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(3),
-                            child: LinearProgressIndicator(
-                              value: pct.clamp(0.0, 1.0),
-                              minHeight: 6,
-                              backgroundColor: const Color(0xFFF2F3FF),
-                              valueColor: AlwaysStoppedAnimation<Color>(color),
+                          NeuInset(
+                            borderRadius: 4,
+                            height: 8,
+                            padding: EdgeInsets.zero,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: FractionallySizedBox(
+                                widthFactor: pct.clamp(0.0, 1.0),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(4),
+                                    color: color,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -683,18 +711,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   // 7. Top Spending Section (Fully Dynamic)
   Widget _buildTopSpendingSection() {
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final textSecondary = AppTheme.getTextSecondary(context);
+    final primary = AppTheme.getPrimary(context);
+
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
+          children: [
             Text(
               'Top Spending',
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
+                color: textPrimary,
               ),
             ),
             Text(
@@ -703,25 +735,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 fontFamily: 'Inter',
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
-                color: AppTheme.primary,
+                color: primary,
               ),
             ),
           ],
         ),
         const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
+        NeuCard(
+          borderRadius: 20,
+          depth: 4.0,
+          blur: 8.0,
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: _topTransactions.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Center(
                     child: Text(
                       'No spending records found in this statement period',
-                      style: TextStyle(fontFamily: 'Inter', color: AppTheme.textSecondary, fontSize: 13),
+                      style: TextStyle(fontFamily: 'Inter', color: textSecondary, fontSize: 13),
                     ),
                   ),
                 )
@@ -735,13 +766,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           child: Row(
                             children: [
-                              Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: tx.iconBgColor,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                              NeuInset(
+                                borderRadius: 10,
+                                padding: const EdgeInsets.all(8),
                                 child: Icon(tx.icon, color: tx.iconColor, size: 20),
                               ),
                               const SizedBox(width: 12),
@@ -751,20 +778,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                   children: [
                                     Text(
                                       tx.title,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontFamily: 'Inter',
                                         fontSize: 14.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppTheme.textPrimary,
+                                        fontWeight: FontWeight.w700,
+                                        color: textPrimary,
                                       ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      '${tx.category} • ${tx.account}',
-                                      style: const TextStyle(
+                                      '${tx.category} \u2022 ${tx.account}',
+                                      style: TextStyle(
                                         fontFamily: 'Inter',
                                         fontSize: 12,
-                                        color: AppTheme.textSecondary,
+                                        color: textSecondary,
                                       ),
                                     ),
                                   ],
@@ -772,18 +799,27 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               ),
                               Text(
                                 '-₹${_formatCurrency(tx.amount.abs())}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: 'Inter',
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFFBA1A1A),
+                                  color: AppTheme.isDark(context)
+                                      ? const Color(0xFFF87171)
+                                      : const Color(0xFFDC2626),
                                 ),
                               ),
                             ],
                           ),
                         ),
                         if (!isLast)
-                          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
+                          Divider(
+                            height: 1,
+                            indent: 64,
+                            endIndent: 16,
+                            color: AppTheme.isDark(context)
+                                ? Colors.white.withValues(alpha: 0.05)
+                                : Colors.black.withValues(alpha: 0.05),
+                          ),
                       ],
                     );
                   }),
@@ -795,51 +831,48 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   // 8. Export Statement Button
   Widget _buildExportButton() {
-    return SizedBox(
-      width: double.infinity,
+    final primary = AppTheme.getPrimary(context);
+
+    return NeuButton(
+      isPrimary: false,
       height: 48,
-      child: OutlinedButton(
-        onPressed: _isExporting ? null : _handleExport,
-        style: OutlinedButton.styleFrom(
-          backgroundColor: Colors.white,
-          side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 0,
-        ),
-        child: _isExporting
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(
-                    Icons.file_download_outlined,
-                    color: AppTheme.primary,
-                    size: 19,
+      borderRadius: 14,
+      onPressed: _isExporting ? null : _handleExport,
+      child: _isExporting
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: primary),
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.file_download_outlined,
+                  color: primary,
+                  size: 19,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Export Statement (CSV)',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: primary,
                   ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Export Statement (CSV)',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-      ),
+                ),
+              ],
+            ),
     );
   }
 }
 
 class _ExpenseTrendChartPainter extends CustomPainter {
+  final bool isDark;
+
+  _ExpenseTrendChartPainter({this.isDark = false});
+
   @override
   void paint(Canvas canvas, Size size) {
     const leftMargin = 32.0;
@@ -847,7 +880,7 @@ class _ExpenseTrendChartPainter extends CustomPainter {
     final chartHeight = size.height;
 
     final dashedPaint = Paint()
-      ..color = const Color(0xFFE2E8F0)
+      ..color = isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFCBD5E1)
       ..strokeWidth = 1.0;
 
     final yLabels = ['₹2k', '₹1k', '₹0'];
@@ -868,10 +901,10 @@ class _ExpenseTrendChartPainter extends CustomPainter {
 
       textPainter.text = TextSpan(
         text: yLabels[i],
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'Inter',
           fontSize: 10,
-          color: Color(0xFF94A3B8),
+          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
         ),
       );
       textPainter.layout();
@@ -905,7 +938,7 @@ class _ExpenseTrendChartPainter extends CustomPainter {
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-        const Color(0xFF4648D4).withValues(alpha: 0.22),
+        const Color(0xFF4648D4).withValues(alpha: isDark ? 0.35 : 0.22),
         const Color(0xFF4648D4).withValues(alpha: 0.0),
       ],
     );
@@ -915,7 +948,7 @@ class _ExpenseTrendChartPainter extends CustomPainter {
     canvas.drawPath(fillPath, fillPaint);
 
     final strokePaint = Paint()
-      ..color = const Color(0xFF4648D4)
+      ..color = const Color(0xFF6063EE)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.round;
@@ -923,11 +956,11 @@ class _ExpenseTrendChartPainter extends CustomPainter {
 
     final day14Point = points[2];
     final outerRingPaint = Paint()
-      ..color = const Color(0xFF4648D4)
+      ..color = const Color(0xFF6063EE)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
     final innerFillPaint = Paint()
-      ..color = Colors.white
+      ..color = isDark ? const Color(0xFF232734) : Colors.white
       ..style = PaintingStyle.fill;
 
     canvas.drawCircle(day14Point, 6, innerFillPaint);

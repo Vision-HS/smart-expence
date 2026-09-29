@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/neumorphic/neu_card.dart';
+import '../../../core/widgets/neumorphic/neu_inset.dart';
+import '../../../core/widgets/neumorphic/neu_switch.dart';
+import '../../../core/widgets/neumorphic/neu_icon_button.dart';
 import '../../categories/screens/categories_screen.dart';
 import '../../expenses/repositories/transaction_repository.dart';
 import '../../transactions/screens/sms_detection_screen.dart';
@@ -20,28 +24,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _smsDetection = true;
 
   void _showDeleteConfirmation() {
+    final surfaceColor = AppTheme.getSurface(context);
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final textSecondary = AppTheme.getTextSecondary(context);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        backgroundColor: surfaceColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Color(0xFFBA1A1A)),
-            SizedBox(width: 8),
+            const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444)),
+            const SizedBox(width: 8),
             Text(
               'Delete All Data?',
-              style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700, fontSize: 18),
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                color: textPrimary,
+              ),
             ),
           ],
         ),
-        content: const Text(
+        content: Text(
           'This action will permanently purge all transactions and pending SMS alerts from this device. This cannot be undone.',
-          style: TextStyle(fontFamily: 'Inter', fontSize: 13.5, height: 1.4, color: AppTheme.textSecondary),
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 13.5,
+            height: 1.4,
+            color: textSecondary,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w600,
+                color: textSecondary,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -52,17 +78,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               messenger.showSnackBar(
                 const SnackBar(
                   content: Text('✓ All local transaction records permanently purged.'),
-                  backgroundColor: Color(0xFFBA1A1A),
+                  backgroundColor: Color(0xFFEF4444),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFBA1A1A),
+              backgroundColor: const Color(0xFFEF4444),
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Delete', style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: Colors.white)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),
@@ -108,7 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message, style: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w500)),
-        backgroundColor: AppTheme.primary,
+        backgroundColor: AppTheme.getPrimary(context),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 2),
@@ -118,8 +151,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canvasColor = AppTheme.getCanvas(context);
+
     return Scaffold(
-      backgroundColor: AppTheme.surface,
+      backgroundColor: canvasColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -156,48 +191,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // 1. Top Bar: "Settings" title + Notification icon + User Avatar
   Widget _buildTopBar(BuildContext context) {
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final primary = AppTheme.getPrimary(context);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text(
+        Text(
           'Settings',
           style: TextStyle(
             fontFamily: 'Inter',
             fontSize: 26,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.w800,
+            color: textPrimary,
             letterSpacing: -0.5,
           ),
         ),
         Row(
           children: [
-            IconButton(
-              icon: const Icon(
-                Icons.notifications_none_rounded,
-                color: AppTheme.textPrimary,
-                size: 24,
-              ),
-              onPressed: () {
+            NeuIconButton(
+              icon: Icons.notifications_none_rounded,
+              size: 40,
+              iconSize: 20,
+              onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const SmsDetectionScreen()),
                 );
               },
             ),
-            const SizedBox(width: 4),
-            InkWell(
+            const SizedBox(width: 10),
+            NeuCard(
+              borderRadius: 20,
+              depth: 3.5,
+              blur: 6.0,
+              padding: EdgeInsets.zero,
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const ProfileScreen()),
                 );
               },
-              borderRadius: BorderRadius.circular(18),
               child: Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  color: AppTheme.primary,
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: primary,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -214,34 +253,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSectionHeader(String title) {
+    final textSecondary = AppTheme.getTextSecondary(context);
+
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: 'Inter',
         fontSize: 11,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.8,
-        color: AppTheme.textSecondary,
+        color: textSecondary,
       ),
     );
   }
 
   // 2. Account & Preferences Card
   Widget _buildAccountPreferencesCard(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
+    final primary = AppTheme.getPrimary(context);
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final textSecondary = AppTheme.getTextSecondary(context);
+
+    return NeuCard(
+      borderRadius: 20,
+      depth: 4.0,
+      blur: 8.0,
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         children: [
           _buildSettingsRow(
             icon: Icons.person_outline_rounded,
-            iconColor: AppTheme.primary,
-            iconBg: const Color(0xFFEEF2FF),
+            iconColor: primary,
             title: 'Profile',
-            subtitle: 'Hiren \u2022 hs@email.com',
+            subtitle: 'Personal details & security',
             onTap: () {
               Navigator.push(
                 context,
@@ -249,29 +292,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
             },
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
+          _buildDivider(),
           _buildSettingsRow(
             icon: Icons.currency_rupee_rounded,
-            iconColor: AppTheme.primary,
-            iconBg: const Color(0xFFEEF2FF),
+            iconColor: primary,
             title: 'Currency',
             subtitle: 'Default base ledger',
-            trailingWidget: const Text(
+            trailingWidget: Text(
               'INR (\u20B9)',
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w700,
+                color: textPrimary,
               ),
             ),
             onTap: () => _showToast('Default Currency: Indian Rupee (INR)'),
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
+          _buildDivider(),
           _buildSettingsRow(
             icon: Icons.category_outlined,
-            iconColor: AppTheme.primary,
-            iconBg: const Color(0xFFEEF2FF),
+            iconColor: primary,
             title: 'Categories',
             subtitle: '11 categories configured',
             onTap: () {
@@ -281,22 +322,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
             },
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
+          _buildDivider(),
           _buildSettingsRow(
-            icon: Icons.light_mode_outlined,
-            iconColor: AppTheme.primary,
-            iconBg: const Color(0xFFEEF2FF),
-            title: 'Appearance',
-            subtitle: 'Theme & visual system',
-            trailingWidget: const Text(
-              'Light mode',
+            icon: Icons.palette_outlined,
+            iconColor: primary,
+            title: 'Appearance & Theme',
+            subtitle: 'Neumorphic Light / Dark switcher',
+            trailingWidget: Text(
+              AppTheme.isDark(context) ? 'Dark' : 'Light',
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 13,
-                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w600,
+                color: textSecondary,
               ),
             ),
-            onTap: () => _showToast('Appearance: Light Mode (Modern Fintech Engine)'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            },
           ),
         ],
       ),
@@ -305,12 +351,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // 3. Automatic Detection Card
   Widget _buildAutomaticDetectionCard(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
+    final textPrimary = AppTheme.getTextPrimary(context);
+
+    return NeuCard(
+      borderRadius: 20,
+      depth: 4.0,
+      blur: 8.0,
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         children: [
           InkWell(
@@ -321,88 +368,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDCFCE7),
-                    borderRadius: BorderRadius.circular(10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  NeuInset(
+                    borderRadius: 12,
+                    padding: const EdgeInsets.all(9),
+                    child: const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      color: Color(0xFF10B981),
+                      size: 20,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.chat_bubble_outline_rounded,
-                    color: Color(0xFF006C49),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'SMS Detection',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'SMS Detection',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: textPrimary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Color(0xFF006C49),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFF10B981),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 5),
-                          const Text(
-                            'Active (Engine v2.4)',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF006C49),
+                            const SizedBox(width: 5),
+                            const Text(
+                              'Active (Engine v2.4)',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF10B981),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Transform.scale(
-                  scale: 0.9,
-                  child: Switch(
+                  NeuSwitch(
                     value: _smsDetection,
                     onChanged: (val) {
                       setState(() => _smsDetection = val);
                     },
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: AppTheme.primary,
-                    inactiveThumbColor: Colors.white,
-                    inactiveTrackColor: const Color(0xFFD2D9F4),
-                    trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
+          _buildDivider(),
           _buildSettingsRow(
             icon: Icons.fact_check_outlined,
-            iconColor: AppTheme.primary,
-            iconBg: const Color(0xFFEEF2FF),
+            iconColor: AppTheme.getPrimary(context),
             title: 'Transaction Review',
-            subtitle: 'Require confirmation',
+            subtitle: 'Require confirmation before recording',
             onTap: () {
               Navigator.push(
                 context,
@@ -417,40 +450,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // 4. Data & Storage Card
   Widget _buildDataStorageCard(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
+    final primary = AppTheme.getPrimary(context);
+
+    return NeuCard(
+      borderRadius: 20,
+      depth: 4.0,
+      blur: 8.0,
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         children: [
           _buildSettingsRow(
             icon: Icons.file_download_outlined,
-            iconColor: AppTheme.primary,
-            iconBg: const Color(0xFFEEF2FF),
+            iconColor: primary,
             title: 'Export Data',
-            subtitle: 'CSV, Excel, or JSON export',
+            subtitle: 'CSV ledger export to clipboard',
             onTap: _exportAllData,
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
+          _buildDivider(),
           _buildSettingsRow(
             icon: Icons.file_upload_outlined,
-            iconColor: AppTheme.primary,
-            iconBg: const Color(0xFFEEF2FF),
+            iconColor: primary,
             title: 'Import Data',
             subtitle: 'Restore previous backup',
             onTap: () => _showToast('Select a backup file to import ledger'),
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
+          _buildDivider(),
           _buildSettingsRow(
             icon: Icons.delete_outline_rounded,
-            iconColor: const Color(0xFFBA1A1A),
-            iconBg: const Color(0xFFFEE2E2),
+            iconColor: const Color(0xFFEF4444),
             title: 'Delete All Data',
-            titleColor: const Color(0xFFBA1A1A),
+            titleColor: const Color(0xFFEF4444),
             subtitle: 'Irreversible purge of local ledger',
-            trailingColor: const Color(0xFFBA1A1A),
+            trailingColor: const Color(0xFFEF4444),
             onTap: _showDeleteConfirmation,
           ),
         ],
@@ -460,18 +491,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // 5. Privacy & About Card
   Widget _buildPrivacyAboutCard(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
+    final primary = AppTheme.getPrimary(context);
+
+    return NeuCard(
+      borderRadius: 20,
+      depth: 4.0,
+      blur: 8.0,
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         children: [
           _buildSettingsRow(
             icon: Icons.shield_outlined,
-            iconColor: AppTheme.primary,
-            iconBg: const Color(0xFFEEF2FF),
+            iconColor: primary,
             title: 'Privacy Information',
             subtitle: 'Local processing & zero telemetry',
             onTap: () {
@@ -481,14 +512,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
             },
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16, color: Color(0xFFF1F5F9)),
+          _buildDivider(),
           _buildSettingsRow(
             icon: Icons.info_outline_rounded,
-            iconColor: AppTheme.primary,
-            iconBg: const Color(0xFFEEF2FF),
+            iconColor: primary,
             title: 'About Smart Expense',
-            subtitle: 'v1.4.2 (Build 2026.09)',
-            onTap: () => _showToast('Smart Expense v1.4.2 â€¢ Modern Fintech Engine'),
+            subtitle: 'v1.4.2 (Build 2026.09) \u2022 Soft UI',
+            onTap: () => _showToast('Smart Expense v1.4.2 \u2022 Neumorphic Soft UI Engine'),
           ),
         ],
       ),
@@ -497,23 +527,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // 6. Footer Notice
   Widget _buildFooter() {
+    final textSecondary = AppTheme.getTextSecondary(context);
+
     return Center(
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: const [
+        children: [
           Icon(
             Icons.lock_outline_rounded,
             size: 14,
-            color: Color(0xFF464554),
+            color: textSecondary,
           ),
-          SizedBox(width: 6),
+          const SizedBox(width: 6),
           Text(
             'All financial data stays strictly on-device',
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF464554),
+              color: textSecondary,
             ),
           ),
         ],
@@ -521,10 +553,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildDivider() {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      indent: 66,
+      endIndent: 16,
+      color: AppTheme.isDark(context)
+          ? Colors.white.withValues(alpha: 0.05)
+          : Colors.black.withValues(alpha: 0.05),
+    );
+  }
+
   Widget _buildSettingsRow({
     required IconData icon,
     required Color iconColor,
-    required Color iconBg,
     required String title,
     Color? titleColor,
     required String subtitle,
@@ -532,26 +575,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Color? trailingColor,
     required VoidCallback onTap,
   }) {
+    final textPrimary = AppTheme.getTextPrimary(context);
+    final textSecondary = AppTheme.getTextSecondary(context);
+
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(10),
-              ),
+            NeuInset(
+              borderRadius: 12,
+              padding: const EdgeInsets.all(9),
               child: Icon(
                 icon,
                 color: iconColor,
                 size: 20,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -561,17 +603,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 14.5,
-                      fontWeight: FontWeight.w600,
-                      color: titleColor ?? AppTheme.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      color: titleColor ?? textPrimary,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 12,
-                      color: AppTheme.textSecondary,
+                      color: textSecondary,
                     ),
                   ),
                 ],
@@ -583,7 +625,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
             Icon(
               Icons.chevron_right_rounded,
-              color: trailingColor ?? AppTheme.textSecondary,
+              color: trailingColor ?? textSecondary,
               size: 20,
             ),
           ],

@@ -1,160 +1,223 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Modern Fintech Engine Brand Colors
+  // Brand Colors (Electric Indigo & Fintech Accents)
   static const Color primary = Color(0xFF4648D4);
+  static const Color primaryDark = Color(0xFF6366F1);
   static const Color primaryActive = Color(0xFF2F2EBE);
   static const Color primaryContainer = Color(0xFF6063EE);
   static const Color primaryFixed = Color(0xFFE1E0FF);
-  
+
   static const Color secondary = Color(0xFF006C49);
+  static const Color secondaryDark = Color(0xFF10B981);
   static const Color secondaryContainer = Color(0xFFECFDF5);
   static const Color secondaryFixed = Color(0xFF6CF8BB);
-  
+
   static const Color error = Color(0xFFEF4444);
+  static const Color errorDark = Color(0xFFF87171);
   static const Color errorContainer = Color(0xFFFEF2F2);
   static const Color tertiary = Color(0xFFB61722);
   static const Color tertiaryContainer = Color(0xFFFFDAD6);
-  
+
   static const Color warning = Color(0xFFF59E0B);
+  static const Color warningDark = Color(0xFFFBBF24);
   static const Color warningContainer = Color(0xFFFFFBEB);
 
-  // Background & Surface Containers
-  static const Color canvas = Color(0xFFFAF8FF);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceContainerLow = Color(0xFFF2F3FF);
-  static const Color surfaceContainer = Color(0xFFEAEDFF);
-  static const Color surfaceContainerHigh = Color(0xFFE2E7FF);
-  static const Color surfaceContainerHighest = Color(0xFFDAE2FD);
-  static const Color border = Color(0xFFE2E8F0);
+  // --- Neumorphic Light Palette ---
+  static const Color lightCanvas = Color(0xFFE6ECF5); // Soft slate off-white
+  static const Color lightSurface = Color(0xFFEBF1FA); // Elevated soft surface
+  static const Color lightInset = Color(0xFFDFE5EE); // Sunken surface
+  static const Color lightShadowTop = Color(0xFFFFFFFF); // White highlight
+  static const Color lightShadowBottom = Color(0xFFA3B1C6); // Dark drop shadow
+
+  // --- Neumorphic Dark Palette ---
+  static const Color darkCanvas = Color(0xFF1B1E28); // Deep matte charcoal canvas
+  static const Color darkSurface = Color(0xFF232734); // Elevated soft dark surface
+  static const Color darkInset = Color(0xFF161922); // Sunken dark surface
+  static const Color darkShadowTop = Color(0xFF2D3346); // Subtle top-left highlight
+  static const Color darkShadowBottom = Color(0xFF10121A); // Deep velvety drop shadow
+
+  // Legacy compatibility constants
+  static const Color canvas = lightCanvas;
+  static const Color surface = lightSurface;
+  static const Color surfaceContainerLow = Color(0xFFF0F4FA);
+  static const Color surfaceContainer = Color(0xFFE6ECF5);
+  static const Color surfaceContainerHigh = Color(0xFFDCE3ED);
+  static const Color surfaceContainerHighest = Color(0xFFD2DCE8);
+  static const Color border = Color(0xFFD5DFEC);
   static const Color outline = Color(0xFF767586);
   static const Color outlineVariant = Color(0xFFC7C4D7);
 
   // Typography Colors
-  static const Color textPrimary = Color(0xFF131B2E);
-  static const Color textSecondary = Color(0xFF64748B);
-  static const Color textMuted = Color(0xFF94A3B8);
+  static const Color lightTextPrimary = Color(0xFF0F172A);
+  static const Color lightTextSecondary = Color(0xFF475569);
+  static const Color lightTextMuted = Color(0xFF94A3B8);
 
+  static const Color darkTextPrimary = Color(0xFFF8FAFC);
+  static const Color darkTextSecondary = Color(0xFF94A3B8);
+  static const Color darkTextMuted = Color(0xFF64748B);
+
+  static const Color textPrimary = lightTextPrimary;
+  static const Color textSecondary = lightTextSecondary;
+  static const Color textMuted = lightTextMuted;
+
+  // --- Dynamic Color & Shadow Helpers ---
+  static bool isDark(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark;
+  }
+
+  static Color getCanvas(BuildContext context) {
+    return isDark(context) ? darkCanvas : lightCanvas;
+  }
+
+  static Color getSurface(BuildContext context) {
+    return isDark(context) ? darkSurface : lightSurface;
+  }
+
+  static Color getInset(BuildContext context) {
+    return isDark(context) ? darkInset : lightInset;
+  }
+
+  static Color getTextPrimary(BuildContext context) {
+    return isDark(context) ? darkTextPrimary : lightTextPrimary;
+  }
+
+  static Color getTextSecondary(BuildContext context) {
+    return isDark(context) ? darkTextSecondary : lightTextSecondary;
+  }
+
+  static Color getTextMuted(BuildContext context) {
+    return isDark(context) ? darkTextMuted : lightTextMuted;
+  }
+
+  static Color getPrimary(BuildContext context) {
+    return isDark(context) ? primaryDark : primary;
+  }
+
+  static Color getSecondary(BuildContext context) {
+    return isDark(context) ? secondaryDark : secondary;
+  }
+
+  static Color getError(BuildContext context) {
+    return isDark(context) ? errorDark : error;
+  }
+
+  /// Neumorphic Extruded Dual BoxShadow
+  static List<BoxShadow> neuElevation(
+    BuildContext context, {
+    double depth = 4.0,
+    double blur = 8.0,
+  }) {
+    final dark = isDark(context);
+    final topColor = dark
+        ? darkShadowTop.withValues(alpha: 0.65)
+        : lightShadowTop.withValues(alpha: 0.95);
+    final bottomColor = dark
+        ? darkShadowBottom.withValues(alpha: 0.85)
+        : lightShadowBottom.withValues(alpha: 0.55);
+
+    return [
+      BoxShadow(
+        color: topColor,
+        offset: Offset(-depth, -depth),
+        blurRadius: blur,
+        spreadRadius: 0,
+      ),
+      BoxShadow(
+        color: bottomColor,
+        offset: Offset(depth, depth),
+        blurRadius: blur,
+        spreadRadius: 0,
+      ),
+    ];
+  }
+
+  /// Neumorphic Subtle Glow / Focus Shadow
+  static List<BoxShadow> neuGlow(Color color, {double blur = 12.0}) {
+    return [
+      BoxShadow(
+        color: color.withValues(alpha: 0.35),
+        offset: const Offset(0, 4),
+        blurRadius: blur,
+        spreadRadius: 1,
+      ),
+    ];
+  }
+
+  // --- Light ThemeData ---
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
-      scaffoldBackgroundColor: canvas,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: lightCanvas,
       primaryColor: primary,
       colorScheme: const ColorScheme.light(
         primary: primary,
         secondary: secondary,
         error: error,
-        surface: surface,
+        surface: lightSurface,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onError: Colors.white,
-        onSurface: textPrimary,
+        onSurface: lightTextPrimary,
       ),
       fontFamily: 'Inter',
-      textTheme: const TextTheme(
-        displayLarge: TextStyle(
-          fontSize: 28,
-          fontWeight: FontWeight.w700,
-          color: textPrimary,
-          letterSpacing: -0.03 * 28,
-        ),
-        headlineLarge: TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.w700,
-          color: textPrimary,
-          letterSpacing: -0.02 * 22,
-        ),
-        titleLarge: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: textPrimary,
-          letterSpacing: -0.01 * 16,
-        ),
-        bodyLarge: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w400,
-          color: textPrimary,
-        ),
-        bodyMedium: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
-          color: textSecondary,
-        ),
-        labelLarge: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          color: textPrimary,
-          letterSpacing: -0.01 * 15,
-        ),
-        labelSmall: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: textSecondary,
-          letterSpacing: 0.02 * 12,
-        ),
-      ),
-      cardTheme: CardThemeData(
-        color: surface,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: border, width: 1),
-        ),
-        margin: EdgeInsets.zero,
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primary,
-          foregroundColor: Colors.white,
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          minimumSize: const Size.fromHeight(48),
-          elevation: 0,
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: border, width: 1),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: border, width: 1),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: primary, width: 1.5),
-        ),
-        hintStyle: const TextStyle(
-          color: textMuted,
-          fontSize: 15,
-        ),
-      ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: canvas,
+        backgroundColor: lightCanvas,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: textPrimary),
+        iconTheme: IconThemeData(color: lightTextPrimary),
         titleTextStyle: TextStyle(
-          fontSize: 22,
+          fontSize: 20,
           fontWeight: FontWeight.w700,
-          color: textPrimary,
-          letterSpacing: -0.02 * 22,
+          color: lightTextPrimary,
           fontFamily: 'Inter',
         ),
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: surface,
-        elevation: 8,
-        selectedItemColor: primary,
-        unselectedItemColor: textMuted,
-        type: BottomNavigationBarType.fixed,
-        showUnselectedLabels: true,
+      cardTheme: CardThemeData(
+        color: lightSurface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: EdgeInsets.zero,
+      ),
+    );
+  }
+
+  // --- Dark ThemeData ---
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: darkCanvas,
+      primaryColor: primaryDark,
+      colorScheme: const ColorScheme.dark(
+        primary: primaryDark,
+        secondary: secondaryDark,
+        error: errorDark,
+        surface: darkSurface,
+        onPrimary: Colors.white,
+        onSecondary: Colors.white,
+        onError: Colors.white,
+        onSurface: darkTextPrimary,
+      ),
+      fontFamily: 'Inter',
+      appBarTheme: const AppBarTheme(
+        backgroundColor: darkCanvas,
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: IconThemeData(color: darkTextPrimary),
+        titleTextStyle: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: darkTextPrimary,
+          fontFamily: 'Inter',
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: darkSurface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: EdgeInsets.zero,
       ),
     );
   }
