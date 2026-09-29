@@ -52,6 +52,136 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadHomeData();
     _setupRealtimeListener();
     NotificationParserService.instance.syncBufferedNotifications();
+    _checkNotificationAccess();
+  }
+
+  Future<void> _checkNotificationAccess() async {
+    // Wait a moment for the UI to settle before showing prompts
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+
+    final hasPermission = await NotificationParserService.instance.checkPermission();
+
+    if (hasPermission) {
+      // Permission is granted — force rebind to ensure service is actively connected
+      await NotificationParserService.instance.requestRebind();
+      // Sync any buffered notifications from background
+      await NotificationParserService.instance.syncBufferedNotifications();
+      return;
+    }
+
+    if (!mounted) return;
+
+    // Show a user-friendly bottom sheet prompting to enable notification access
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.notifications_active_rounded,
+                color: Color(0xFFF59E0B),
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Notification Access Required',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E1B4B),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Smart Expense needs Notification Access to automatically detect your UPI payments from Google Pay, PhonePe, Paytm, etc.\n\nPlease enable "Smart Expense Notification Reader" on the next screen.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13.5,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF64748B),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await NotificationParserService.instance.requestPermission();
+                  // After user returns from Settings, re-check and rebind
+                  await Future.delayed(const Duration(seconds: 3));
+                  final nowGranted = await NotificationParserService.instance.checkPermission();
+                  if (nowGranted) {
+                    await NotificationParserService.instance.requestRebind();
+                    await NotificationParserService.instance.syncBufferedNotifications();
+                    if (mounted) _loadHomeData();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4648D4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Enable Notification Access',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                'Skip for Now',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   void _setupRealtimeListener() {

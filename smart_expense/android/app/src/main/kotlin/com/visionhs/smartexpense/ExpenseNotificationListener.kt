@@ -145,10 +145,28 @@ class ExpenseNotificationListener : NotificationListenerService() {
             Log.d(TAG, "Financial notification captured from $packageName: [$title] $text")
             val listener = notificationListener
             if (listener != null) {
-                listener.invoke(packageName, title, text, timestamp)
+                try {
+                    listener.invoke(packageName, title, text, timestamp)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error sending to Flutter, buffering instead", e)
+                    saveNotificationToBuffer(applicationContext, packageName, title, text, timestamp)
+                }
             } else {
+                Log.d(TAG, "Flutter not connected, buffering notification")
                 saveNotificationToBuffer(applicationContext, packageName, title, text, timestamp)
             }
         }
+    }
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        Log.i(TAG, "NotificationListenerService CONNECTED — now reading notifications")
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        Log.w(TAG, "NotificationListenerService DISCONNECTED — requesting rebind")
+        // Request Android to rebind this listener automatically
+        requestRebind(android.content.ComponentName(this, ExpenseNotificationListener::class.java))
     }
 }

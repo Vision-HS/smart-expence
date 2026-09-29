@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -106,6 +107,38 @@ class MainActivity : FlutterActivity() {
                 "getBufferedNotifications" -> {
                     val buffered = ExpenseNotificationListener.getAndClearBufferedNotifications(this)
                     result.success(buffered)
+                }
+                "requestRebind" -> {
+                    // Force Android to reconnect the notification listener service
+                    try {
+                        val componentName = android.content.ComponentName(this, ExpenseNotificationListener::class.java)
+                        NotificationListenerService.requestRebind(componentName)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("REBIND_ERROR", e.message, null)
+                    }
+                }
+                "toggleNotificationListener" -> {
+                    // Toggle off and on to force re-registration (workaround for stuck listeners)
+                    try {
+                        val pm = packageManager
+                        val componentName = android.content.ComponentName(this, ExpenseNotificationListener::class.java)
+                        pm.setComponentEnabledSetting(
+                            componentName,
+                            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                            android.content.pm.PackageManager.DONT_KILL_APP
+                        )
+                        pm.setComponentEnabledSetting(
+                            componentName,
+                            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                            android.content.pm.PackageManager.DONT_KILL_APP
+                        )
+                        val rebindComponent = android.content.ComponentName(this, ExpenseNotificationListener::class.java)
+                        NotificationListenerService.requestRebind(rebindComponent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("TOGGLE_ERROR", e.message, null)
+                    }
                 }
                 else -> result.notImplemented()
             }

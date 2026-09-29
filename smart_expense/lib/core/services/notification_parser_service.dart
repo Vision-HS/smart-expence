@@ -41,6 +41,29 @@ class NotificationParserService {
     }
   }
 
+  /// Force Android to reconnect the notification listener service
+  Future<bool> requestRebind() async {
+    try {
+      final bool success =
+          await _methodChannel.invokeMethod('requestRebind') ?? false;
+      return success;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Toggle the notification listener off and on to force re-registration
+  Future<bool> toggleListener() async {
+    try {
+      final bool success =
+          await _methodChannel.invokeMethod('toggleNotificationListener') ??
+              false;
+      return success;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void dispose() {
     _nativeSubscription?.cancel();
     _nativeSubscription = null;
